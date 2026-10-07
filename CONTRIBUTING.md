@@ -14,7 +14,7 @@ The Composer lock file is intentionally not tracked: this is a library, and comp
 
 ## Compatibility
 
-Keep production code compatible with PHP 8.3 and Laravel 12–13. Development tooling can vary with the selected framework and PHP version.
+Keep production code compatible with PHP 8.3 and Laravel 12-13. Development tooling can vary with the selected framework and PHP version.
 
 GitHub Actions tests both Laravel majors on PHP 8.3 and 8.4 with lowest and highest dependencies. A workflow definition alone does not establish that every combination has passed.
 
@@ -37,4 +37,6 @@ Restore `composer.json` to the intended library constraints after testing. Do no
 - Document implemented features separately from planned capabilities.
 - Verify Google and EU requirements against primary sources when implementing consent behavior. Do not describe the unfinished package as compliant.
 
-The initial skeleton includes no runtime consent state, tracker requests, cookies, routes, database schema, or frontend dependencies.
+The first beta includes service metadata, consent state, and versioned cookie persistence. It registers no application routes and has no database schema, tracker requests, script loader, or frontend dependencies. New decision endpoints must remain in the host application and use its normal validation and CSRF protection.
+
+Development releases use beta tags until the complete interface and integrations are ready. Keep `CHANGELOG.md`, `README.md`, and the corresponding `docs/releases/` note accurate for each milestone.

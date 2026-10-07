@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "webcrafts-studio/consent-for-laravel",
-    "description": "The foundation for a Laravel cookie consent package with customizable banners and planned Google Consent Mode v2 integrations.",
+    "description": "A Laravel cookie consent foundation with a service registry, category preferences, and versioned consent persistence.",
     "keywords": ["laravel", "cookies", "consent", "consent-mode"],
     "type": "library",
     "license": "MIT",
@@ -18,8 +18,11 @@
     "require": {
         "php": "^8.3",
         "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/cookie": "^12.0 || ^13.0",
+        "illuminate/http": "^12.0 || ^13.0",
         "illuminate/support": "^12.0 || ^13.0",
-        "spatie/laravel-package-tools": "^1.92"
+        "spatie/laravel-package-tools": "^1.92",
+        "symfony/http-foundation": "^7.2 || ^8.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",

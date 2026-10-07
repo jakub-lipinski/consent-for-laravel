@@ -29,7 +29,7 @@ it('publishes configuration through the consent-config tag', function () {
         ->assertExitCode(0);
 
     try {
-        expect(require config_path('consent.php'))->toBe([]);
+        expect(require config_path('consent.php'))->toBe(require $source);
     } finally {
         unlink(config_path('consent.php'));
     }
@@ -62,7 +62,7 @@ it('can cache the application configuration', function () {
     try {
         $this->artisan('config:cache')->assertExitCode(0);
 
-        expect(require $path)->toHaveKey('consent', []);
+        expect((require $path)['consent'])->toBe(require dirname(__DIR__, 2).'/config/consent.php');
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);
     }

@@ -2,15 +2,17 @@
 
 ## Scope
 
-This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. Its current state is the initial package skeleton. Banner UI, consent persistence, script gating, Google Consent Mode v2, and tracker presets are planned but not implemented.
+This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. The first beta implements the PHP service registry, category decisions, versioning, expiry, and cookie persistence. Banner UI, browser script gating, Google Consent Mode v2, and tracker presets are planned but not implemented.
 
 ## Conventions
 
-- Production code targets PHP 8.3+ and Laravel 12–13.
+- Production code targets PHP 8.3+ and Laravel 12-13.
 - Use the `ConsentForLaravel\ConsentForLaravel` PSR-4 namespace.
 - Use Spatie Laravel Package Tools and provider auto-discovery.
 - Configuration, views, and translations use `consent`; publishing tags are `consent-config`, `consent-views`, and `consent-translations`.
 - Keep configuration serializable and compatible with Laravel configuration caching.
+- Keep consent reads stateless and free of persistence side effects. Optional categories are denied without a current, valid decision.
+- The browser-readable preference cookie is not an authorization mechanism or a database audit trail. Keep session and CSRF cookies encrypted.
 - Do not add unused example facades, commands, migrations, or infrastructure.
 - Do not hard-code a package version or commit `composer.lock` or `vendor`.
 - Use verified repository URLs; the Git remote is under `jakub-lipinski`, while the Composer publisher follows Lens's `webcrafts-studio` convention.
