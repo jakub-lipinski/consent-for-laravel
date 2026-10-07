@@ -4,13 +4,14 @@
 
 ```bash
 composer install
+npm ci --ignore-scripts
 composer format
 composer check
 ```
 
-Individual checks are available as `composer test`, `composer analyse`, `composer format:check`, and `composer validate --strict`.
+Individual checks are available as `composer test`, `composer test:js`, `composer analyse`, `composer format:check`, and `composer validate --strict`. `composer check` runs all of them. Development JavaScript tests use Node 22.12+ on the 22.x line, or Node 24+, and jsdom. Consuming applications need no Node installation or frontend build.
 
-The Composer lock file is intentionally not tracked: this is a library, and compatibility must be tested against multiple dependency versions. Release versions come from Git tags, not a hard-coded Composer version.
+The Composer lock file is intentionally not tracked: this is a library, and compatibility must be tested against multiple dependency versions. The npm lock file is tracked for reproducible private development tests; the package is not published to npm. Release versions come from Git tags, not a hard-coded Composer version.
 
 ## Compatibility
 
@@ -37,6 +38,10 @@ Restore `composer.json` to the intended library constraints after testing. Do no
 - Document implemented features separately from planned capabilities.
 - Verify Google and EU requirements against primary sources when implementing consent behavior. Do not describe the unfinished package as compliant.
 
-The first beta includes service metadata, consent state, and versioned cookie persistence. It registers no application routes and has no database schema, tracker requests, script loader, or frontend dependencies. New decision endpoints must remain in the host application and use its normal validation and CSRF protection.
+Beta.2 includes service metadata, consent state, versioned cookie persistence, `@consent`, and a framework-free browser loader. It registers no application routes or database schema. New server decision endpoints must remain in the host application and use its normal validation and CSRF protection.
+
+JavaScript tests cover consent transitions, strict cookie validation, resource failures, ordering, duplicate blocks/sources, storage failures, cleanup, expiry, SPA fragments, and actual serialization through PHP. Set `CONSENT_TEST_PHP` to select the PHP executable used by the serialization test when needed.
+
+The manual Testbench fixture in `tests/Browser/router.php` exercises classic scripts, modules with imports and top-level await, CSP, published assets, in-flight withdrawal, and cooperative cleanup. See [browser verification instructions](docs/browser-runtime.md#verification). Use only local fixture scripts; avoid real trackers during tests. jsdom tests alone do not prove CSP or module execution behavior.
 
 Development releases use beta tags until the complete interface and integrations are ready. Keep `CHANGELOG.md`, `README.md`, and the corresponding `docs/releases/` note accurate for each milestone.

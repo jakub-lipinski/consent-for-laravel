@@ -21,13 +21,17 @@ final readonly class ConsentSettings
     /** @var 'lax'|'strict' */
     public string $cookieSameSite;
 
+    public int $scriptTimeoutMs;
+
+    public int $cleanupTimeoutMs;
+
     public function __construct(mixed $configuration, ?string $sessionCookieName = null)
     {
         if (! is_array($configuration)) {
             throw new InvalidArgumentException('consent configuration must be an array.');
         }
 
-        $configuration += ['policy_version' => '1', 'retention_days' => 180, 'cookie' => []];
+        $configuration += ['policy_version' => '1', 'retention_days' => 180, 'cookie' => [], 'loader' => []];
         $version = $configuration['policy_version'];
         $days = $configuration['retention_days'];
         $cookie = $configuration['cookie'];
@@ -71,6 +75,20 @@ final readonly class ConsentSettings
             throw new InvalidArgumentException('consent.cookie.same_site must be lax or strict.');
         }
 
+        $loader = $configuration['loader'];
+
+        if (! is_array($loader) || array_diff(array_keys($loader), ['script_timeout_ms', 'cleanup_timeout_ms']) !== []) {
+            throw new InvalidArgumentException('consent.loader must contain only script_timeout_ms and cleanup_timeout_ms.');
+        }
+
+        $loader += ['script_timeout_ms' => 15000, 'cleanup_timeout_ms' => 3000];
+
+        foreach ($loader as $timeout) {
+            if (! is_int($timeout) || $timeout < 1 || $timeout > 120000) {
+                throw new InvalidArgumentException('Consent loader timeouts must be integers between 1 and 120000 milliseconds.');
+            }
+        }
+
         $this->policyVersion = $version;
         $this->retentionDays = $days;
         $this->cookieName = $name;
@@ -78,5 +96,7 @@ final readonly class ConsentSettings
         $this->cookieDomain = $domain;
         $this->cookieSecure = $secure;
         $this->cookieSameSite = $sameSite;
+        $this->scriptTimeoutMs = $loader['script_timeout_ms'];
+        $this->cleanupTimeoutMs = $loader['cleanup_timeout_ms'];
     }
 }

@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "webcrafts-studio/consent-for-laravel",
-    "description": "A Laravel cookie consent foundation with a service registry, category preferences, and versioned consent persistence.",
+    "description": "Service-based cookie consent for Laravel with versioned preferences and browser script gating.",
     "keywords": ["laravel", "cookies", "consent", "consent-mode"],
     "type": "library",
     "license": "MIT",
@@ -21,6 +21,7 @@
         "illuminate/cookie": "^12.0 || ^13.0",
         "illuminate/http": "^12.0 || ^13.0",
         "illuminate/support": "^12.0 || ^13.0",
+        "illuminate/view": "^12.0 || ^13.0",
         "spatie/laravel-package-tools": "^1.92",
         "symfony/http-foundation": "^7.2 || ^8.0"
     },
@@ -52,6 +53,7 @@
         "post-autoload-dump": "@composer prepare",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
         "test": "@php vendor/bin/pest",
+        "test:js": ["npm run check", "npm test"],
         "analyse": "@php vendor/bin/phpstan analyse --memory-limit=512M",
         "format": "@php vendor/bin/pint",
         "format:check": "@php vendor/bin/pint --test",
@@ -59,7 +61,8 @@
             "@composer validate --strict",
             "@format:check",
             "@analyse",
-            "@test"
+            "@test",
+            "@test:js"
         ]
     },
     "config": {

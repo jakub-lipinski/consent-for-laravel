@@ -1,0 +1,11 @@
+{
+  "name": "consent-for-laravel-tests",
+  "private": true,
+  "description": "Development tests for the bundled vanilla JavaScript consent runtime",
+  "engines": { "node": "^22.12.0 || >=24.0.0" },
+  "scripts": {
+    "test": "node --test tests/JavaScript/*.test.cjs",
+    "check": "node --check resources/js/consent.js"
+  },
+  "devDependencies": { "jsdom": "^27.4.0" }
+}

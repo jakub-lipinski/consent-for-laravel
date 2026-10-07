@@ -19,4 +19,9 @@ jobs:
           coverage: none
           tools: composer:v2
       - run: composer install --prefer-dist --no-interaction
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
       - run: composer check

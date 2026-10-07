@@ -16,7 +16,14 @@ return [
         'same_site' => 'lax',
     ],
 
+    'loader' => [
+        'script_timeout_ms' => 15000,
+        'cleanup_timeout_ms' => 3000,
+    ],
+
     // This registry describes services. It does not load scripts or trackers.
     // Each service requires category, name, description, and an optional boolean enabled.
+    // Optional cookies: [['name' => '_example', 'path' => '/', 'domain' => null]].
+    // Use prefix instead of name to match visible cookies with a known prefix.
     'services' => [],
 ];

@@ -5,6 +5,7 @@ namespace ConsentForLaravel\ConsentForLaravel;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\View\Compilers\BladeCompiler;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -27,11 +28,18 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
         ));
 
         $this->app->bind(ServiceRegistry::class, fn (Application $app): ServiceRegistry => new ServiceRegistry($app->make(Repository::class)->get('consent.services', [])));
+        $this->app->scoped(ScriptRenderer::class);
     }
 
     public function packageBooted(): void
     {
         // Only the preferences cookie is readable by the browser. It contains no identity or authentication data.
         EncryptCookies::except($this->app->make(ConsentSettings::class)->cookieName);
+
+        $blade = $this->app->make(BladeCompiler::class);
+        $blade->directive('consent', fn (string $expression): string => '<?php echo app(\\'.ScriptRenderer::class.'::class)->open('.$expression.'); ?>');
+        $blade->directive('endconsent', fn (): string => '</template>');
+
+        $this->publishes([__DIR__.'/../resources/js/consent.js' => public_path('vendor/consent/consent.js')], 'consent-assets');
     }
 }

@@ -22,7 +22,7 @@ final readonly class ServiceRegistry
                 throw new InvalidArgumentException('Consent service IDs must start with a letter and contain only letters, digits, dots, underscores, or hyphens.');
             }
 
-            if (! is_array($definition) || array_diff(array_keys($definition), ['category', 'name', 'description', 'enabled']) !== []) {
+            if (! is_array($definition) || array_diff(array_keys($definition), ['category', 'name', 'description', 'enabled', 'cookies']) !== []) {
                 throw new InvalidArgumentException("Invalid definition for consent service [{$id}].");
             }
 
@@ -44,8 +44,16 @@ final readonly class ServiceRegistry
                 throw new InvalidArgumentException("Consent service [{$id}] requires a valid category, non-empty name and description, and a boolean enabled value.");
             }
 
+            $cookies = array_key_exists('cookies', $definition) ? $definition['cookies'] : [];
+
+            if (! is_array($cookies) || ! array_is_list($cookies)) {
+                throw new InvalidArgumentException("Consent service [{$id}] cookies must be a list of cookie rules.");
+            }
+
+            $cookies = array_map(fn (mixed $cookie): CookieRule => new CookieRule($cookie), $cookies);
+
             if ($enabled) {
-                $services[$id] = new Service($id, $category, trim($name), trim($description));
+                $services[$id] = new Service($id, $category, trim($name), trim($description), $cookies);
             }
         }
 
