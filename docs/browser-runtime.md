@@ -127,11 +127,6 @@ Cookie rules match visible first-party cookie names exactly or by a literal pref
 
 `composer test:js` runs syntax checks and Node/jsdom tests, including a real PHP/browser serialization round trip. jsdom does not execute modules or enforce CSP; those features require a real browser.
 
-A local Testbench fixture is available for manual browser checks:
+Use a disposable Laravel application outside this repository for native browser checks. Install this package through a local Composer path repository, include the head component in the host layout, and register a mock analytics service. Serve all mock resources from that application. The package itself supplies no standalone test page or server entry point.
 
-```bash
-composer install
-php -S 127.0.0.1:8873 tests/Browser/router.php
-```
-
-Open `http://127.0.0.1:8873/`. Check pending/refused states with zero tracker requests, grant/library/initialization order, duplicate prevention, persisted refusal after reload, cookie deletion, published assets, cooperative cleanup, in-flight withdrawal, and modules with imports/top-level await. The blocked scenario uses an intentionally invalid nonce under a nonce-only CSP and must stop its dependent script. Set `CONSENT_BROWSER_LOG` to a temporary file path if you need an independent request log. The fixture uses only local mock scripts. Test the beta.3 banner with the separate [UI fixture and verification instructions](interface.md#verification).
+Verify pending/refused states with zero optional requests, grant/library/initialization order, duplicate prevention, persisted refusal after reload, declared cookie deletion, published assets, cooperative cleanup, in-flight withdrawal, and modules with imports/top-level await. Test rejection of an intentionally invalid inline nonce under a nonce-only CSP and confirm that the block's dependent script cannot run. Use the host server's request log to independently check network activation. Test the banner with the [interface verification checklist](interface.md#verification).

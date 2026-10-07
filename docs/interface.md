@@ -74,22 +74,13 @@ The host website must preserve root font sizing, viewport scaling, supported bro
 composer install
 npm ci --ignore-scripts
 composer check
-php -S 127.0.0.1:8873 tests/Browser/ui.php
 ```
 
-Open the local fixture in a real browser. It uses only local mock trackers. Query options:
+Use a disposable Laravel host application outside this repository, installing the package through a local Composer path repository. Add the head/banner components to that application's layout and register local mock services. All host markup, test resources, server entry points, and mock trackers stay outside the package checkout. Documentation/presentation websites belong in a separate repository.
 
-| Option | Effect |
-|---|---|
-| `position=bottom-left`, `bottom-right`, `bottom-center` | Banner/launcher position |
-| `locale=en` or `pl` | Interface language |
-| `assets=1` | Separate CSS and runtime/UI scripts under a nonce-based CSP |
-| `all=1` | All five categories, including longer scrolling content |
-| `empty=1` | Necessary only, no initial optional banner |
-| `stress=1` | Increased line, letter, word, and paragraph spacing |
-| `zoom=1` | Root text size 200% |
+Check all three positions, both languages, inline and published assets under CSP, necessary-only and all-category registries, storage failures, and saved choices across visits. Verify Tab/Shift+Tab loops, Space, Escape, focus return, draft cancellation, overlay behavior around host-page focus, saving, reopening, and withdrawal. Check 320 CSS pixel reflow, 200% text size, and increased line/letter/word/paragraph spacing, including the fully visible final save control.
 
-The page includes reset, text size/spacing, blocked-cookie simulation, and audit controls. Audit preferences opens the modal and runs axe with WCAG A/AA tags, including contrast and target size. Audit current page checks the visible banner or launcher. In jsdom, only geometry-dependent contrast and target-size rules are disabled; semantic/state tests use real PHP-rendered Blade output.
+Run full axe checks with WCAG A/AA tags in that host application, including contrast and target size, for the banner, modal, and launcher. In jsdom, only geometry-dependent contrast and target-size rules are disabled; semantic/state tests use real PHP-rendered Blade fragments and require no standalone website.
 
 Beta.3 local native-browser checks covered all three positions, English/Polish, nonce-based inline and published assets, keyboard loops and draft cancellation, saved decisions across visits, selection/withdrawal with reload and declared cookie cleanup, storage errors, and 320 CSS pixel reflow. At 320 pixels, both the banner and all-category modal also had no horizontal overflow with combined 200% text size and spacing stress. Tab to the final save control scrolled it fully into view.
 

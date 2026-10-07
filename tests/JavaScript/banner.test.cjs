@@ -30,7 +30,7 @@ async function page(t, options = {}) {
         url: 'https://example.test/', runScripts: options.noJavaScript ? 'outside-only' : 'dangerously', cookieJar: jar, virtualConsole: console,
         beforeParse(window) {
             window.TextEncoder = TextEncoder;
-            // jsdom has no dialog top layer. Test state/focus logic here and native modality in the browser fixture.
+            // jsdom has no dialog top layer. Verify native modality in a disposable host application.
             if (!options.noDialog) {
                 window.HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
                 window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new window.Event('close')); };

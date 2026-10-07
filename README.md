@@ -11,6 +11,8 @@ A Laravel package for service-based cookie preferences and versioned consent per
 - Laravel service provider auto-discovery.
 - No database, migrations, frontend framework, or Node build step.
 
+The package supplies consent components for the consuming application's layout. Documentation and presentation websites belong in a separate repository. Installation adds no standalone website, dashboard, or application routes.
+
 ## Installation
 
 The package is under development. To use this checkout in a Laravel application, add a local path repository to the application's `composer.json`:

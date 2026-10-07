@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Removed standalone browser test/demo pages from the package checkout. Native browser verification uses a disposable host application outside this repository.
+- Clarified that documentation/presentation websites belong in a separate repository; the package supplies only components and consent behavior for the consuming application.
+
 ## v1.0.0-beta.3 - Accessible cookie preferences
 
 The third development beta provides a complete English/Polish cookie collection interface connected to the existing consent runtime.
@@ -12,7 +19,7 @@ The third development beta provides a complete English/Polish cookie collection 
 - English/Polish UI, locale overrides, service-display translations, policy URL, and validated contrast-aware colors.
 - Keyboard and focus management, alerts/status, reflow and text-spacing support, and protection against obscuring host-page focus.
 - Custom `data-consent-open` buttons, `Consent.openPreferences()`, and a readable unavailable-interface fallback.
-- Blade/PHP interface tests, axe-core structural checks, a native-browser fixture, and an accessibility integration guide.
+- Blade/PHP interface tests, axe-core structural checks, native-browser verification, and an accessibility integration guide.
 
 ### Changed
 
@@ -41,7 +48,7 @@ The second development beta activates declared scripts only after consent and ha
 - Default reload for running or in-flight code on withdrawal, cooperative cleanup, bounded timeouts, and script/storage diagnostics.
 - First-party cookie cleanup rules with protection for preference, session, CSRF, and remember cookies.
 - Fail-closed storage handling, temporary same-tab denial recovery, and synchronization of expiry, server updates, and other tabs.
-- Node/jsdom tests, a real PHP/browser serialization test, a manual browser fixture, and JavaScript checks in CI.
+- Node/jsdom tests, a real PHP/browser serialization test, native-browser verification, and JavaScript checks in CI.
 
 ### Changed
 
