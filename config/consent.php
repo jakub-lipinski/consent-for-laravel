@@ -21,6 +21,15 @@ return [
         'cleanup_timeout_ms' => 3000,
     ],
 
+    'ui' => [
+        'position' => 'bottom-left',
+        // null uses the application's locale, with English as the fallback.
+        'locale' => null,
+        'policy_url' => null,
+        // Optional six-digit hex colors. Contrast is validated before rendering.
+        'colors' => [],
+    ],
+
     // This registry describes services. It does not load scripts or trackers.
     // Each service requires category, name, description, and an optional boolean enabled.
     // Optional cookies: [['name' => '_example', 'path' => '/', 'domain' => null]].

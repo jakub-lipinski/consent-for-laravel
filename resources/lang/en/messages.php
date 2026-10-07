@@ -1,0 +1,32 @@
+<?php
+
+return [
+    'banner_title' => 'Your privacy matters',
+    'banner_description' => 'We use necessary cookies to keep this website working. With your permission, we also use optional cookies for the purposes listed in preferences. You can change your choice at any time.',
+    'accept_all' => 'Accept all',
+    'reject_optional' => 'Reject optional',
+    'customize' => 'Manage preferences',
+    'dismiss' => 'Close cookie notice without choosing',
+    'preferences_title' => 'Cookie preferences',
+    'preferences_description' => 'Choose which optional categories you allow. Necessary cookies are always active. Only categories used on this website are shown.',
+    'categories_label' => 'Cookie categories',
+    'always_active' => 'Always active',
+    'services_label' => 'Services in this category',
+    'policy_link' => 'Cookie policy',
+    'save' => 'Save preferences',
+    'close' => 'Close preferences without saving',
+    'reopen' => 'Change cookie preferences',
+    'saving' => 'Saving your preferences.',
+    'saved' => 'Your cookie preferences have been saved.',
+    'changed' => 'Your cookie preferences changed. The current selection has been refreshed.',
+    'save_failed' => 'Your preferences could not be saved. Check whether this website can store cookies, then try again. Optional cookies remain blocked.',
+    'leave_page' => 'Your choice could not be remembered. Close this tab to stop tools that were already running.',
+    'unavailable' => 'Cookie preferences are unavailable. They require JavaScript and a supported browser.',
+    'categories' => [
+        'necessary' => ['title' => 'Necessary', 'description' => 'Support essential website functions and remember your cookie preferences. They cannot be turned off here.'],
+        'analytics' => ['title' => 'Analytics', 'description' => 'Help understand visits and how people use this website.'],
+        'marketing' => ['title' => 'Marketing', 'description' => 'Support advertising and measure campaign results.'],
+        'performance' => ['title' => 'Performance', 'description' => 'Help measure speed, reliability, and technical performance.'],
+        'other' => ['title' => 'Other', 'description' => 'Support the additional purposes described by the services below.'],
+    ],
+];

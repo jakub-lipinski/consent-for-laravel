@@ -1,0 +1,32 @@
+<?php
+
+return [
+    'banner_title' => 'Twoja prywatność jest ważna',
+    'banner_description' => 'Używamy niezbędnych cookies do działania strony. Za Twoją zgodą korzystamy też z opcjonalnych cookies w celach opisanych w preferencjach. W każdej chwili możesz zmienić swój wybór.',
+    'accept_all' => 'Akceptuj wszystkie',
+    'reject_optional' => 'Odrzuć opcjonalne',
+    'customize' => 'Zarządzaj preferencjami',
+    'dismiss' => 'Zamknij informację o cookies bez dokonywania wyboru',
+    'preferences_title' => 'Preferencje cookies',
+    'preferences_description' => 'Wybierz, na które opcjonalne kategorie się zgadzasz. Niezbędne cookies są zawsze aktywne. Pokazujemy tylko kategorie używane na tej stronie.',
+    'categories_label' => 'Kategorie cookies',
+    'always_active' => 'Zawsze aktywne',
+    'services_label' => 'Usługi w tej kategorii',
+    'policy_link' => 'Polityka cookies',
+    'save' => 'Zapisz preferencje',
+    'close' => 'Zamknij preferencje bez zapisywania',
+    'reopen' => 'Zmień preferencje cookies',
+    'saving' => 'Zapisywanie preferencji.',
+    'saved' => 'Preferencje cookies zostały zapisane.',
+    'changed' => 'Preferencje cookies zmieniły się. Aktualny wybór został odświeżony.',
+    'save_failed' => 'Nie udało się zapisać preferencji. Sprawdź, czy ta strona może zapisywać cookies, i spróbuj ponownie. Opcjonalne cookies pozostają zablokowane.',
+    'leave_page' => 'Nie można zapamiętać Twojego wyboru. Zamknij tę kartę, aby zatrzymać narzędzia, które działały wcześniej.',
+    'unavailable' => 'Zarządzanie preferencjami cookies jest niedostępne. Wymaga JavaScript i obsługiwanej przeglądarki.',
+    'categories' => [
+        'necessary' => ['title' => 'Niezbędne', 'description' => 'Zapewniają podstawowe funkcje strony i zapamiętują preferencje cookies. Nie można ich tutaj wyłączyć.'],
+        'analytics' => ['title' => 'Analityczne', 'description' => 'Pomagają zrozumieć ruch i sposób korzystania ze strony.'],
+        'marketing' => ['title' => 'Marketingowe', 'description' => 'Służą reklamie i pomiarowi wyników kampanii.'],
+        'performance' => ['title' => 'Wydajnościowe', 'description' => 'Pomagają mierzyć szybkość, niezawodność i wydajność techniczną.'],
+        'other' => ['title' => 'Inne', 'description' => 'Służą dodatkowym celom opisanym przy usługach poniżej.'],
+    ],
+];

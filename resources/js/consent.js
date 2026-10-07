@@ -392,6 +392,7 @@
         choose,
         acceptAll: () => choose(Object.fromEntries(config.categories.map(key => [key, true]))),
         rejectOptional: () => choose({}),
+        openPreferences: () => !document.dispatchEvent(new CustomEvent('consent:open-preferences', { cancelable: true })),
         forget: () => operation(async () => {
             try {
                 expireCookie(config.cookie.name, config.cookie.path, config.cookie.domain);

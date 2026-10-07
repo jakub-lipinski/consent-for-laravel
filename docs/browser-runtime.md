@@ -1,6 +1,6 @@
 # Browser runtime
 
-`v1.0.0-beta.2` provides script gating and a public browser API. Include `<x-consent::head />` early in the layout, register processing purposes in `consent.services`, and wrap optional script tags in `@consent('category', 'stable-id') ... @endconsent`.
+Since `v1.0.0-beta.2`, the package provides script gating and a public browser API. Beta.3 adds the [built-in cookie interface](interface.md). Include `<x-consent::head />` early in the layout, register processing purposes in `consent.services`, and wrap optional script tags in `@consent('category', 'stable-id') ... @endconsent`.
 
 ## Execution lifecycle
 
@@ -28,6 +28,7 @@ All methods are on `window.Consent`. Optional categories must be registered befo
 | `choose(choices)` | Promise: replace choices, save and verify the cookie, await revocation cleanup |
 | `acceptAll()` | Promise: grant used categories |
 | `rejectOptional()` | Promise: remember an explicit refusal |
+| `openPreferences()` | Open the mounted UI; return true if handled, false if unavailable |
 | `forget()` | Promise: remove the decision and return to pending, with the same revocation lifecycle |
 | `refresh()` | Promise: synchronize a server or another tab's decision and await cleanup |
 | `onChange(callback)` | Register `(current, previous, source)`; return an unsubscribe function |
@@ -92,6 +93,7 @@ Events are dispatched on `document`:
 
 | Event | `detail` |
 |---|---|
+| `consent:open-preferences` | No detail; cancelable request used by `openPreferences()` to reach the mounted UI |
 | `consent:ready` | `{ current }` at DOM initialization |
 | `consent:change` | `{ current, previous, source }` |
 | `consent:error` | `{ code, message, block }`; `block` is nullable |
@@ -132,4 +134,4 @@ composer install
 php -S 127.0.0.1:8873 tests/Browser/router.php
 ```
 
-Open `http://127.0.0.1:8873/`. Check pending/refused states with zero tracker requests, grant/library/initialization order, duplicate prevention, persisted refusal after reload, cookie deletion, published assets, cooperative cleanup, in-flight withdrawal, and modules with imports/top-level await. The blocked scenario uses an intentionally invalid nonce under a nonce-only CSP and must stop its dependent script. Set `CONSENT_BROWSER_LOG` to a temporary file path if you need an independent request log. The fixture uses only local mock scripts and is not the banner planned for beta.3.
+Open `http://127.0.0.1:8873/`. Check pending/refused states with zero tracker requests, grant/library/initialization order, duplicate prevention, persisted refusal after reload, cookie deletion, published assets, cooperative cleanup, in-flight withdrawal, and modules with imports/top-level await. The blocked scenario uses an intentionally invalid nonce under a nonce-only CSP and must stop its dependent script. Set `CONSENT_BROWSER_LOG` to a temporary file path if you need an independent request log. The fixture uses only local mock scripts. Test the beta.3 banner with the separate [UI fixture and verification instructions](interface.md#verification).

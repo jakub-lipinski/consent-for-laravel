@@ -29,6 +29,7 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
 
         $this->app->bind(ServiceRegistry::class, fn (Application $app): ServiceRegistry => new ServiceRegistry($app->make(Repository::class)->get('consent.services', [])));
         $this->app->scoped(ScriptRenderer::class);
+        $this->app->bind(BannerSettings::class, fn (Application $app): BannerSettings => new BannerSettings($app->make(Repository::class)->get('consent.ui', [])));
     }
 
     public function packageBooted(): void
@@ -40,6 +41,10 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
         $blade->directive('consent', fn (string $expression): string => '<?php echo app(\\'.ScriptRenderer::class.'::class)->open('.$expression.'); ?>');
         $blade->directive('endconsent', fn (): string => '</template>');
 
-        $this->publishes([__DIR__.'/../resources/js/consent.js' => public_path('vendor/consent/consent.js')], 'consent-assets');
+        $this->publishes([
+            __DIR__.'/../resources/js/consent.js' => public_path('vendor/consent/consent.js'),
+            __DIR__.'/../resources/js/banner.js' => public_path('vendor/consent/banner.js'),
+            __DIR__.'/../resources/css/consent.css' => public_path('vendor/consent/consent.css'),
+        ], 'consent-assets');
     }
 }

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. Beta.2 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, and consent withdrawal. Banner UI, translations, Google Consent Mode v2, and tracker presets remain planned.
+This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. Beta.3 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, a three-position banner, a native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2 and tracker presets remain planned.
 
 ## Conventions
 
@@ -23,4 +23,4 @@ This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, n
 
 ## Validation
 
-Run `npm ci --ignore-scripts` for development dependencies, `composer format` after PHP edits, and `composer check` before committing. Use focused Pest / Testbench and Node/jsdom tests. Verify modules and CSP with the manual browser fixture, since jsdom cannot validate them. Compatibility claims must distinguish configured CI coverage from locally executed checks.
+Run `npm ci --ignore-scripts` for development dependencies, `composer format` after PHP edits, and `composer check` before committing. Use focused Pest / Testbench and Node/jsdom tests. Verify modules and CSP with the manual browser fixture, since jsdom cannot validate them. Verify UI geometry, contrast, keyboard modality, reflow, and text resizing with the native browser fixture; axe/jsdom checks alone do not establish accessibility. Compatibility claims must distinguish configured CI coverage from locally executed checks.

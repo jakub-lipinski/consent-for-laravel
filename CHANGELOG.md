@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.0.0-beta.3 - Accessible cookie preferences
+
+The third development beta provides a complete English/Polish cookie collection interface connected to the existing consent runtime.
+
+### Added
+
+- `<x-consent::banner />` in bottom-left, bottom-right, and wide bottom-center layouts.
+- A white theme with light shadow, sentence case headings, spacious controls, and equally prominent acceptance/refusal.
+- Native preferences modal, only used categories, service purposes, explicit draft saving, and a small reopening icon.
+- English/Polish UI, locale overrides, service-display translations, policy URL, and validated contrast-aware colors.
+- Keyboard and focus management, alerts/status, reflow and text-spacing support, and protection against obscuring host-page focus.
+- Custom `data-consent-open` buttons, `Consent.openPreferences()`, and a readable unavailable-interface fallback.
+- Blade/PHP interface tests, axe-core structural checks, a native-browser fixture, and an accessibility integration guide.
+
+### Changed
+
+- Added the direct Illuminate Translation dependency and implemented UI configuration.
+- Asset publishing now includes the UI script and stylesheet alongside the core runtime.
+- Connected storage errors, external decision changes, expiry, and withdrawal to the interface.
+
+### Upgrade Notes
+
+- Add the banner component, merge `consent.ui`, set the actual cookie policy, and rebuild configuration/view caches.
+- Refresh published assets/overridden views and supply script/style CSP nonces where required.
+- Existing decisions retain the same schema and remain valid with unchanged policy/service metadata.
+- The interface targets applicable WCAG 2.2 A/AA criteria; customizations and the host website require their own assessment.
+- GCM v2 and tracker presets remain in later milestones. See the [complete release notes](docs/releases/v1.0.0-beta.3.md).
+
 ## v1.0.0-beta.2 - Consent-aware script lifecycle
 
 The second development beta activates declared scripts only after consent and handles preference changes on a running page.

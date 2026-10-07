@@ -1,8 +1,8 @@
 # Consent for Laravel
 
-A Laravel package for service-based cookie preferences and versioned consent persistence, built toward customizable banners and straightforward analytics integrations.
+A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.0.0-beta.2`.** This beta adds `@consent`, a browser runtime, ordered script loading, and consent withdrawal to the PHP foundation. The banner, translations, Google Consent Mode v2, and tracker presets remain planned. It does not yet provide a complete consent collection interface or claim EU legal compliance or WCAG conformance.
+**Current release: `v1.0.0-beta.3`.** This beta adds three banner positions, a preferences modal, a reopening icon, validated theme colors, and English/Polish translations. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. Google Consent Mode v2 and tracker presets remain planned. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Requirements
 
@@ -40,7 +40,98 @@ No manual provider registration is required. Configure the package in `config/co
 php artisan config:cache
 ```
 
-The package does not register routes. Use the browser API with your own interface, or the PHP API from your application's controllers or services.
+The package does not register routes. Use the built-in Blade interface, the browser API with your own interface, or the PHP API from your application's controllers or services.
+
+## Add the banner
+
+Register the optional services used by your website as described below, then add two components to your main layout:
+
+```blade
+<head>
+    <x-consent::head />
+</head>
+<body>
+    {{-- Your page content --}}
+    <x-consent::banner />
+
+    @consent('analytics', 'site-analytics')
+        <script src="https://your-provider.example/analytics.js"></script>
+    @endconsent
+</body>
+```
+
+The provider URL is a placeholder. Each component renders once per response. No JavaScript framework, stylesheet import, npm installation, or application endpoint is required. The head component must precede code using `window.Consent`.
+
+A visitor without a current decision sees the banner. Accept and reject have equal prominence; manage preferences opens a native modal showing necessary plus only the globally used optional categories. Optional switches start off. Changing a switch is a draft until Save preferences is activated. Closing either interface makes no decision and grants no optional permission.
+
+After a saved choice, a small cookie icon reopens preferences. A saved refusal stays remembered. With no optional services, only the icon is shown, allowing visitors to read the necessary category. Withdrawing an active category uses the runtime's cleanup and default reload behavior.
+
+### Position, language, policy, and colors
+
+```php
+'ui' => [
+    'position' => 'bottom-left', // bottom-left, bottom-right, bottom-center
+    'locale' => null,           // Follow the app locale; or explicitly en / pl
+    'policy_url' => '/cookies',
+    'colors' => [
+        'accent' => '#245c49',
+        'focus' => '#245c49',
+    ],
+],
+```
+
+Left and right use a compact white card with a light shadow. Center uses a wide horizontal layout on larger screens; all variants stack on small screens. Text retains sentence case and the action buttons have space between them. The launcher follows the chosen position.
+
+The application locale selects Polish for `pl`, including `pl_PL` / `pl-PL`, and English otherwise. An explicit UI locale must be `en` or `pl`. Per-component overrides are available:
+
+```blade
+<x-consent::banner locale="pl" position="bottom-right" policy-url="/cookies" />
+```
+
+`policy_url` accepts an absolute website path or an HTTP(S) URL without credentials; null omits the link. Provide your site's actual cookie policy. Colors accept six-digit hex values. The available defaults are:
+
+| Color key | Default | Role |
+|---|---|---|
+| `background` | `#ffffff` | Card, dialog, and icon background |
+| `text` | `#182722` | Headings and ordinary text |
+| `muted` | `#52625b` | Descriptions and secondary text |
+| `accent` | `#245c49` | Choice buttons, links, and selected switches |
+| `accent_text` | `#ffffff` | Text and switch thumb on the accent |
+| `border` | `#e1e7e3` | Decorative dividers and card edges |
+| `control` | `#67776e` | Outlined controls and unchecked switches |
+| `focus` | `#245c49` | Keyboard focus outline |
+
+The renderer rejects invalid colors and combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. Custom CSS and published view changes require their own accessibility checks. Changing layout, colors, or UI language does not invalidate a decision.
+
+### Translations and custom openers
+
+```bash
+php artisan vendor:publish --tag=consent-translations
+php artisan vendor:publish --tag=consent-views
+```
+
+Edit `lang/vendor/consent/en/messages.php` or `pl/messages.php` for interface wording. Keep category purposes accurate. Service names and purposes fall back to their canonical registry metadata. To translate them without changing the consent fingerprint, add `lang/vendor/consent/pl/services.php`:
+
+```php
+return [
+    'site-analytics' => [
+        'name' => 'Statystyki strony',
+        'description' => 'Pomiar odwiedzin i sposobu korzystania ze strony.',
+    ],
+];
+```
+
+Translations use Laravel's dot lookup; IDs containing dots need corresponding nested translation arrays. A material change of purpose still requires updating canonical service metadata or `policy_version`. If a shared HTML cache serves multiple languages, vary it by the application's locale.
+
+Add a preferences entry to a footer or privacy page:
+
+```blade
+<button type="button" data-consent-open>Cookie preferences</button>
+```
+
+`window.Consent.openPreferences()` also opens the mounted interface and returns true when handled, or false when unavailable. Opening, closing, and draft changes never write a decision. The interface displays a retryable error if cookies cannot be saved and keeps optional processing blocked.
+
+The banner does not steal focus on arrival. The modal supports Tab, Shift+Tab, Space, Escape, and focus return. An overlay yields when it would cover a focused host-page control. Without JavaScript, the runtime, or native dialog support, a readable fallback remains with the policy link when configured. Without JavaScript or the core runtime, optional scripts stay inert. See the [interface and accessibility guide](docs/interface.md) for verification, browser support, and integration responsibilities.
 
 ## Register services
 
@@ -210,10 +301,11 @@ Use exactly one `name` or `prefix` per rule; `path` defaults to `/` and `domain`
 
 ### CSP and published assets
 
-The head component embeds the runtime by default and supports a CSP nonce:
+The components embed their scripts/styles by default and support a CSP nonce:
 
 ```blade
 <x-consent::head :nonce="$cspNonce" />
+<x-consent::banner :nonce="$cspNonce" />
 ```
 
 Your application generates a fresh nonce and the matching HTTP CSP header. Activated scripts inherit that nonce unless they declare their own. To serve a separate file:
@@ -224,9 +316,14 @@ php artisan vendor:publish --tag=consent-assets
 
 ```blade
 <x-consent::head :src="asset('vendor/consent/consent.js')" :nonce="$cspNonce" />
+<x-consent::banner
+    :style-src="asset('vendor/consent/consent.css')"
+    :script-src="asset('vendor/consent/banner.js')"
+    :nonce="$cspNonce"
+/>
 ```
 
-Republish assets with `--force` after upgrades and use your deployment's asset cache busting. Configuration is emitted before the runtime; the component renders once. No npm installation or build step is needed in the consuming application.
+Republish assets with `--force` after upgrades and use your deployment's asset cache busting. Configuration is emitted before the runtime. Custom colors still emit a small inline theme style, so a matching style nonce remains necessary under a strict CSP. No npm installation or build step is needed in the consuming application.
 
 ## Versions and expiry
 
@@ -287,13 +384,12 @@ Responses passed to `persist()` or `forget()` receive `Cache-Control: private, n
 
 ## Next betas
 
-- `beta.3`: three banner positions, preferences modal, reopening button, colors, English/Polish, and accessibility against applicable WCAG 2.2 A and AA criteria.
 - `beta.4`: Google Consent Mode v2, GA4, and Google Ads.
 - `beta.5`: GTM bridge, consent template, and container configuration.
 - `beta.6`: Meta Pixel and Microsoft Clarity.
 - `beta.7`: integrated verification, documentation, and release preparation.
 
-These are planned milestones. More betas can be released for fixes before `v1.0.0`. The publishable head view is available; this beta contains no banner or translation strings.
+These are planned milestones. More betas can be released for fixes before `v1.0.0`. The head and banner views, interface translations, and browser assets can be published.
 
 ## Development
 
@@ -304,7 +400,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the beta release notes](docs/releases/v1.0.0-beta.2.md) for this release's scope.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the beta release notes](docs/releases/v1.0.0-beta.3.md) for this release's scope.
 
 ## License
 
