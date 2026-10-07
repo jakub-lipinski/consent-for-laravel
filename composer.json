@@ -1,0 +1,69 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "webcrafts-studio/consent-for-laravel",
+    "description": "The foundation for a Laravel cookie consent package with customizable banners and planned Google Consent Mode v2 integrations.",
+    "keywords": ["laravel", "cookies", "consent", "consent-mode"],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Lipiński",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/jakub-lipinski/consent-for-laravel/issues",
+        "source": "https://github.com/jakub-lipinski/consent-for-laravel"
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0",
+        "spatie/laravel-package-tools": "^1.92"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.27",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^3.8 || ^4.0",
+        "pestphp/pest-plugin-laravel": "^3.2 || ^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ConsentForLaravel\\ConsentForLaravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ConsentForLaravel\\ConsentForLaravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ConsentForLaravel\\ConsentForLaravel\\ConsentForLaravelServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": "@composer prepare",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "test": "@php vendor/bin/pest",
+        "analyse": "@php vendor/bin/phpstan analyse --memory-limit=512M",
+        "format": "@php vendor/bin/pint",
+        "format:check": "@php vendor/bin/pint --test",
+        "check": [
+            "@composer validate --strict",
+            "@format:check",
+            "@analyse",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "prefer-stable": true
+}

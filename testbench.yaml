@@ -1,0 +1,2 @@
+providers:
+  - ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider
