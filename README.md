@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.0.0-beta.4`.** This beta adds Google Consent Mode v2, GA4 and Google Ads presets, guarded event routing, and Basic/explicit Advanced modes. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. GTM, Meta Pixel, and Clarity remain planned. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.0.0-beta.5`.** This beta adds Meta Pixel and Microsoft Clarity presets with strict loading gates, guarded events, separate Clarity advertising consent, and withdrawal. Google Consent Mode v2, GA4 and Google Ads remain available. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. GTM is deferred. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Google presets
 
@@ -23,6 +23,25 @@ await Consent.google.event('AW-123456789/YOUR_CONVERSION_LABEL', 'conversion', {
 ```
 
 Use your registered destination and actual conversion label. The helper refuses events without permission and does not replay them later. Read the [complete Google integration guide](docs/google.md) for modes, mappings, setup, SPA page views, CSP, cookie scopes, and withdrawal limits.
+
+## Meta Pixel and Microsoft Clarity
+
+```php
+'presets' => [
+    'meta_pixel' => ['enabled' => true, 'pixel_id' => env('CONSENT_META_PIXEL_ID')],
+    'clarity' => ['enabled' => true, 'project_id' => env('CONSENT_CLARITY_ID'), 'advertising' => false],
+],
+```
+
+Use the existing head/banner components. Meta loads only with marketing permission; Clarity loads only with analytics permission. Clarity ad storage requires explicitly enabled advertising plus analytics and marketing permission. The presets register their purposes and cleanup rules automatically. Remove duplicate vendor snippets and enable Require cookie consent in your Clarity project.
+
+```javascript
+await Consent.meta.track('Purchase', { value: 49.90, currency: 'PLN' }, { eventID: 'order-123' });
+await Consent.meta.trackCustom('NewsletterSignup');
+await Consent.clarity.event('checkout-completed');
+```
+
+Helpers check permission at invocation and dispatch and never replay denied calls. Active withdrawal signals denial before reload and removes declared visible first-party cookies. See the [complete tracker guide](docs/tracker-presets.md) for setup, SPA events, masking, advertising, CSP, scopes, and upgrade notes.
 
 ## Requirements
 
@@ -407,9 +426,9 @@ Responses passed to `persist()` or `forget()` receive `Cache-Control: private, n
 ## Next betas
 
 - `beta.4` (implemented): Google Consent Mode v2, GA4, and Google Ads.
-- `beta.5`: GTM bridge, consent template, and container configuration.
-- `beta.6`: Meta Pixel and Microsoft Clarity.
-- `beta.7`: integrated verification, documentation, and release preparation.
+- `beta.5`: Meta Pixel and Microsoft Clarity, implemented with guarded events and withdrawal.
+- `beta.6`: integrated verification, documentation, and release preparation.
+- GTM: deferred, with no assigned beta.
 
 These are implemented and planned milestones. More betas can be released for fixes before `v1.0.0`. The head and banner views, interface translations, and browser assets can be published.
 

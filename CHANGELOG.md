@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.0.0-beta.5 - Meta Pixel and Microsoft Clarity
+
+### Added
+
+- ID-based Meta Pixel and Microsoft Clarity presets with strict marketing/analytics loading gates.
+- Guarded Meta standard/custom events, optional event IDs, and PageView control for SPA owners.
+- Clarity Consent API v2, custom events, and explicitly enabled advertising requiring separate marketing permission.
+- English/Polish purposes, canonical overrides, cookie cleanup declarations, strict settings, and integration fingerprints.
+
+### Changed
+
+- Meta/Clarity receive new consent signals before listeners and mandatory active withdrawal reload.
+- Existing tracker installs fail closed; ordinary provider failures are isolated, while load timeouts require a fresh document.
+- GTM is deferred with no assigned beta. Beta.6 now targets release preparation.
+
+### Upgrade Notes
+
+- Merge new configuration/translations, remove duplicate installs, and refresh published assets/caches.
+- Enable Require cookie consent and configure masking for Clarity; verify vendor account behavior separately.
+- Cookie schema and inactive beta.4 fingerprints remain compatible. Active tracker changes invalidate decisions.
+- See [release notes](docs/releases/v1.0.0-beta.5.md) and the [tracker guide](docs/tracker-presets.md).
+
+
 ## v1.0.0-beta.4 - Google consent and measurement presets
 
 The fourth beta adds Consent Mode v2 and ID-based GA4 / Google Ads setup.

@@ -134,3 +134,9 @@ Verify pending/refused states with zero optional requests, grant/library/initial
 ## Google presets in beta.4
 
 The runtime now includes the optional gtag.js bridge and GA4/Google Ads presets. See the [Google guide](google.md) for `Consent.google.state()` and `Consent.google.event(destination, name, parameters)`, Basic/Advanced behavior, signal ordering, destination routing, and mandatory active-preset reload. Custom blocks retain their existing gates in both modes. External modules use an additional nonce-bearing import marker after their original SRI-checked load to wait for imports and top-level await before dependent scripts.
+
+## Meta Pixel and Microsoft Clarity in beta.5
+
+`Consent.meta.track(name, parameters, options)` and `trackCustom` send guarded Meta events. `Consent.clarity.event(name)` sends a guarded Clarity custom event; `Consent.clarity.state()` inspects frozen Consent API v2 signals without loading its SDK. Both presets are disabled by default, use strict category gates, preserve permission at invocation/dispatch, and discard denied events without later replay.
+
+Meta needs marketing. Clarity needs analytics; ad storage also needs explicitly enabled advertising and marketing. Active preset withdrawal, including Clarity advertising withdrawal, always reloads even when a custom hook supplies `reload: false`. See the [tracker guide](tracker-presets.md) for complete configuration, payloads, cookie scopes, and lifecycle behavior.

@@ -1,6 +1,6 @@
 # Google Consent Mode v2 and presets
 
-Beta.4 adds a gtag.js consent bridge and built-in GA4 / Google Ads initialization. GTM is a separate beta.5 milestone. The package is not a Google-certified CMP and does not certify a site's legal compliance.
+Beta.4 adds a gtag.js consent bridge and built-in GA4 / Google Ads initialization. GTM is deferred with no assigned beta. The package is not a Google-certified CMP and does not certify a site's legal compliance.
 
 ## Quick setup
 
