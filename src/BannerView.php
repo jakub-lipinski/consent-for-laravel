@@ -8,7 +8,12 @@ use RuntimeException;
 
 final readonly class BannerView
 {
-    public function __construct(public BannerSettings $settings, public ServiceRegistry $services, private Translator $translator) {}
+    public function __construct(public BannerSettings $settings, public ServiceRegistry $services, private Translator $translator, private GoogleSettings $google) {}
+
+    public function advancedGoogle(): bool
+    {
+        return $this->google->enabled && $this->google->mode === 'advanced' && $this->google->targets !== [];
+    }
 
     public function locale(?string $override = null): string
     {
@@ -31,6 +36,11 @@ final readonly class BannerView
     {
         $key = 'consent::services.'.$service->id.'.'.$field;
         $translated = $this->translator->get($key, [], $locale, false);
+
+        if ($translated === $key && isset(GoogleSettings::SERVICE_DEFAULTS[$service->id][$field])
+            && $service->{$field} === GoogleSettings::SERVICE_DEFAULTS[$service->id][$field]) {
+            return $this->text('presets.'.$service->id.'.'.$field, $locale);
+        }
 
         return is_string($translated) && $translated !== $key && trim($translated) !== '' ? $translated : match ($field) {
             'name' => $service->name,

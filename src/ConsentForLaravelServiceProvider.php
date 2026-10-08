@@ -27,7 +27,15 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
             $app->make(Repository::class)->get('session.cookie'),
         ));
 
-        $this->app->bind(ServiceRegistry::class, fn (Application $app): ServiceRegistry => new ServiceRegistry($app->make(Repository::class)->get('consent.services', [])));
+        $this->app->bind(GoogleSettings::class, fn (Application $app): GoogleSettings => new GoogleSettings(
+            $app->make(Repository::class)->get('consent.google', []),
+            $app->make(Repository::class)->get('consent.presets', []),
+        ));
+        $this->app->bind(ServiceRegistry::class, function (Application $app): ServiceRegistry {
+            $google = $app->make(GoogleSettings::class);
+
+            return new ServiceRegistry($app->make(Repository::class)->get('consent.services', []), $google->services(), $google->toArray() ?? []);
+        });
         $this->app->scoped(ScriptRenderer::class);
         $this->app->bind(BannerSettings::class, fn (Application $app): BannerSettings => new BannerSettings($app->make(Repository::class)->get('consent.ui', [])));
     }

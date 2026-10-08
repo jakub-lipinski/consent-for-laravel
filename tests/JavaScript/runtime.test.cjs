@@ -20,6 +20,12 @@ const configuration = overrides => ({
     protectedCookies: ['consent_preferences', 'XSRF-TOKEN', 'laravel_session', 'app_session'],
     scriptTimeoutMs: 500, cleanupTimeoutMs: 50, ...overrides,
 });
+const googleConfig = (mode = 'basic') => ({ mode, targets: [
+    { id: 'G-ABCD1234', category: 'analytics', sendPageView: true },
+    { id: 'AW-123456789', category: 'marketing', sendPageView: false },
+] });
+const googleFiles = { '/gtag/js': 'window.googleLoadedWith = Array.from(dataLayer, args => Array.from(args));' };
+const commands = p => plain(Array.from(p.window.dataLayer, args => Array.from(args)));
 const decision = (config, choices = { analytics: true }, overrides = {}) => {
     const decidedAt = Math.floor(Date.now() / 1000);
     return {
@@ -557,4 +563,173 @@ test('Unicode policy strings and numbers inside strings retain their valid cooki
     const config = configuration({ policyVersion: 'Zażółć "decidedAt":1.0 v2' });
     const p = await page(t, { config, state: decision(config) });
     assert.equal(p.api.allowed('analytics'), true);
+});
+
+test('Google Basic sends no requests or measurement commands for pending or refused preferences', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(commands(p).map(args => args[0]), ['consent', 'set', 'set', 'consent']);
+    assert.equal(commands(p)[0][2].ad_user_data, 'denied');
+    assert.equal(commands(p)[0][2].analytics_storage, 'denied');
+    assert.equal(p.window['ga-disable-G-ABCD1234'], true);
+    await p.api.rejectOptional();
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    assert.equal(await p.api.google.event('AW-123456789/label', 'conversion'), false);
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), false);
+});
+
+test('Google defaults and restored update precede tag load and GA configuration without enabling Ads', async t => {
+    const config = configuration({ google: googleConfig() });
+    const p = await page(t, { config, state: decision(config), files: googleFiles });
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    const beforeLoad = plain(p.window.googleLoadedWith);
+    assert.equal(beforeLoad[0][1], 'default');
+    assert.equal(beforeLoad[3][1], 'update');
+    assert.equal(beforeLoad[3][2].analytics_storage, 'granted');
+    assert.equal(beforeLoad[3][2].ad_personalization, 'denied');
+    assert.deepEqual(commands(p).filter(args => args[0] === 'config'), [['config', 'G-ABCD1234', {
+        send_page_view: true, allow_google_signals: false, allow_ad_personalization_signals: false,
+    }]]);
+    assert.equal(p.window['ga-disable-G-ABCD1234'], false);
+    assert.equal(await p.api.google.event('AW-123456789/label', 'conversion'), false);
+});
+
+test('presets share one library and initialize each destination once after its category is granted', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    await p.api.choose({ marketing: true });
+    await p.api.whenIdle();
+    assert.equal(new URL(p.window.document.querySelector('script[src]').src).searchParams.get('id'), 'AW-123456789');
+    assert.deepEqual(commands(p).filter(args => args[0] === 'config').map(args => args[1]), ['AW-123456789']);
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    await p.api.refresh();
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    assert.deepEqual(commands(p).filter(args => args[0] === 'config').map(args => args[1]), ['AW-123456789', 'G-ABCD1234']);
+    assert.equal(commands(p).filter(args => args[0] === 'js').length, 1);
+    assert.equal(p.window.document.querySelector('script[src]').nonce, 'fixture-nonce');
+});
+
+test('Google events are routed only to their granted configured destination', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    await p.api.choose({ analytics: true });
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase', { value: 25, currency: 'PLN' }), true);
+    assert.deepEqual(commands(p).at(-1), ['event', 'purchase', { value: 25, currency: 'PLN', send_to: 'G-ABCD1234' }]);
+    assert.equal(await p.api.google.event('AW-123456789/label', 'conversion'), false);
+    await p.api.acceptAll();
+    assert.equal(await p.api.google.event('AW-123456789/label', 'conversion', { transaction_id: 'order-1' }), true);
+    assert.equal(commands(p).at(-1)[2].send_to, 'AW-123456789/label');
+    for (const args of [
+        ['G-UNKNOWN1', 'purchase'], ['AW-123456789', 'conversion'], ['AW-123456789/label', 'purchase'],
+        ['AW-123456789/label/invalid', 'conversion'], ['G-ABCD1234', 'purchase', { send_to: 'other' }],
+        ['G-ABCD1234', 'purchase', { event_callback: () => {} }], ['G-ABCD1234', 'bad event'],
+    ]) await assert.rejects(p.api.google.event(...args), /Google|destination|Ads/);
+});
+
+test('Google revocation updates all v2 signals before listeners and mandatory reload, even with custom cleanup', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    p.api.onRevoke('analytics', () => {}, { reload: false });
+    p.api.onRevoke('marketing', () => {}, { reload: false });
+    let atChange, atReload;
+    p.api.onChange(() => { atChange = commands(p).at(-1); });
+    p.window.document.addEventListener('consent:reload-required', () => { atReload = commands(p).at(-1); });
+    await p.api.rejectOptional();
+    assert.equal(atChange[1], 'update');
+    assert.equal(atReload[1], 'update');
+    for (const signal of ['analytics_storage', 'ad_storage', 'ad_user_data', 'ad_personalization']) assert.equal(atReload[2][signal], 'denied');
+    assert.equal(p.window['ga-disable-G-ABCD1234'], true);
+    assert.ok(p.reloads.some(event => event.reason === 'revocation'));
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), false);
+});
+
+test('withdrawing during Google download cancels configuration and blocks later events', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: { '/gtag/js': { body: 'window.lateGoogle = true;', delay: 100 } } });
+    await p.api.acceptAll();
+    await delay(10);
+    await p.api.rejectOptional();
+    await p.api.whenIdle();
+    assert.equal(commands(p).some(args => args[0] === 'config'), false);
+    assert.ok(p.reloads.some(event => event.reason === 'revocation'));
+    assert.equal(await p.api.google.event('AW-123456789/label', 'conversion'), false);
+});
+
+test('Google Advanced explicitly loads denied tags but the event helper still requires consent', async t => {
+    const p = await page(t, { config: { google: googleConfig('advanced') }, files: googleFiles });
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    assert.equal(commands(p)[3][2].analytics_storage, 'denied');
+    assert.equal(commands(p).filter(args => args[0] === 'config').length, 2);
+    assert.equal(p.window['ga-disable-G-ABCD1234'], false);
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), false);
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    assert.equal(commands(p).filter(args => args[0] === 'config').length, 2);
+    await p.api.rejectOptional();
+    assert.equal(p.window['ga-disable-G-ABCD1234'], true);
+    assert.ok(p.reloads.some(event => event.reason === 'revocation'));
+});
+
+test('Google load failure emits diagnostics without configuring destinations or accepting events', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: { '/gtag/js': new Error('Blocked by CSP') } });
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    assert.ok(p.errors.some(event => event.code === 'google'));
+    assert.equal(commands(p).some(args => args[0] === 'config'), false);
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), false);
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+});
+
+test('Google bridge supports custom gated gtag code and no automatic library', async t => {
+    const p = await page(t, { config: { google: { mode: 'basic', targets: [] } },
+        html: block('manual-google', 'analytics', inline("gtag('event', 'custom');")) });
+    assert.equal(commands(p).some(args => args[0] === 'event'), false);
+    await p.api.choose({ analytics: true });
+    await p.api.whenIdle();
+    assert.deepEqual(commands(p).at(-1), ['event', 'custom']);
+    assert.equal(commands(p).find(args => args[1] === 'update' && args[2].analytics_storage === 'granted')[2].ad_user_data, 'denied');
+    assert.deepEqual(p.loader.requests, []);
+});
+
+test('GA automatic page view can be disabled for SPA owners', async t => {
+    const google = googleConfig();
+    google.targets[0].sendPageView = false;
+    const p = await page(t, { config: { google }, files: googleFiles });
+    await p.api.choose({ analytics: true });
+    await p.api.whenIdle();
+    assert.equal(commands(p).find(args => args[0] === 'config')[2].send_page_view, false);
+});
+
+for (const conflict of ['gtag', 'queued config', 'non-array layer']) {
+    test(`preexisting Google ${conflict} fails closed rather than setting late defaults`, async t => {
+        const p = await page(t, { config: { google: googleConfig() }, before(window) {
+            if (conflict === 'gtag') window.gtag = () => {};
+            else window.dataLayer = conflict === 'queued config' ? [['config', 'G-ABCD1234']] : {};
+        } });
+        assert.equal(p.api, undefined);
+        assert.ok(p.errors.some(error => error.code === 'configuration'));
+        assert.deepEqual(p.loader.requests, []);
+    });
+}
+
+test('blocked preference storage never grants Google or starts Basic requests', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles, before(window) {
+        Object.defineProperty(window.document, 'cookie', { get: () => '', set: () => {} });
+    } });
+    await assert.rejects(p.api.acceptAll(), /stored|persist|cookie/i);
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    assert.equal(p.api.google.state().ad_user_data, 'denied');
+    assert.equal(p.api.google.state().analytics_storage, 'denied');
+});
+
+test('expired Google consent becomes denied before refresh cleanup', async t => {
+    const config = configuration({ google: googleConfig() });
+    const p = await page(t, { config, state: decision(config), files: googleFiles });
+    store(p.jar, decision(config, { analytics: true }, { expiresAt: Math.floor(Date.now() / 1000) }));
+    await p.api.refresh();
+    assert.equal(commands(p).at(-1)[1], 'update');
+    assert.equal(commands(p).at(-1)[2].analytics_storage, 'denied');
+    assert.ok(p.reloads.some(event => event.reason === 'revocation'));
 });

@@ -9,13 +9,21 @@ final readonly class ServiceRegistry
     /** @var array<string, Service> */
     private array $services;
 
-    public function __construct(mixed $definitions)
+    /** @param array<string, array<string, mixed>> $presets
+     * @param  array<string, mixed>  $integrationContext
+     */
+    public function __construct(mixed $definitions, array $presets = [], private array $integrationContext = [])
     {
         if (! is_array($definitions)) {
             throw new InvalidArgumentException('consent.services must be an array.');
         }
 
         $services = [];
+
+        if (array_intersect_key($definitions, $presets) !== []) {
+            throw new InvalidArgumentException('Custom consent services must not reuse enabled preset IDs.');
+        }
+        $definitions += $presets;
 
         foreach ($definitions as $id => $definition) {
             if (! is_string($id) || ! preg_match('/\A[a-zA-Z][a-zA-Z0-9._-]{0,127}\z/', $id)) {
@@ -95,6 +103,11 @@ final readonly class ServiceRegistry
 
     public function version(): string
     {
-        return hash('sha256', json_encode(array_map(fn (Service $service): array => $service->toArray(), $this->services), JSON_THROW_ON_ERROR));
+        $definitions = array_map(fn (Service $service): array => $service->toArray(), $this->services);
+        if ($this->integrationContext !== []) {
+            $definitions['__integrations'] = $this->integrationContext;
+        }
+
+        return hash('sha256', json_encode($definitions, JSON_THROW_ON_ERROR));
     }
 }

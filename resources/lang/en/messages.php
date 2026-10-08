@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'google_advanced' => 'Google tags also send cookieless measurement signals before you choose and when optional cookies are denied.',
+    'presets' => [
+        'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Measure website visits and usage.'],
+        'google-ads' => ['name' => 'Google Ads', 'description' => 'Measure advertising conversions and manage advertising consent signals.'],
+    ],
     'banner_title' => 'Your privacy matters',
     'banner_description' => 'We use necessary cookies to keep this website working. With your permission, we also use optional cookies for the purposes listed in preferences. You can change your choice at any time.',
     'accept_all' => 'Accept all',

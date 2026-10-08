@@ -28,6 +28,23 @@
             || !Number.isInteger(config.cleanupTimeoutMs) || config.cleanupTimeoutMs < 1) {
             throw new Error('Invalid consent runtime configuration.');
         }
+        if (config.google != null && (!['basic', 'advanced'].includes(config.google.mode)
+            || !Array.isArray(config.google.targets) || config.google.targets.some(target =>
+                !config.categories.includes(target.category) || typeof target.sendPageView !== 'boolean'
+                || !(target.category === 'analytics' && /^G-[A-Z0-9]{4,32}$/.test(target.id)
+                    || target.category === 'marketing' && /^AW-[1-9][0-9]{0,19}$/.test(target.id))))) {
+            throw new Error('Invalid Google runtime configuration.');
+        }
+        if (config.google != null && (window.gtag !== undefined || window.dataLayer !== undefined
+            && (!Array.isArray(window.dataLayer) || window.dataLayer.length !== 0)
+            || [...document.scripts].some(script => {
+                if (!script.src) return false;
+                const source = new URL(script.src, document.baseURI);
+                return ['www.googletagmanager.com', 'googletagmanager.com'].includes(source.hostname)
+                    && ['/gtag/js', '/gtm.js'].includes(source.pathname);
+            }))) {
+            throw new Error('Place Consent before Google tags and remove duplicate Google bootstraps.');
+        }
     } catch (error) {
         report('configuration', error);
         return;
@@ -167,10 +184,11 @@
         let requiresReload = false;
         const tasks = [];
         for (const category of categories) {
-            const active = [...records.values()].filter(record => record.category === category && record.started);
+            const active = [...records.values(), ...googleRecords.values()].filter(record => record.category === category && record.started);
             const hooks = [...(revocationHooks.get(category) ?? [])];
             const inFlight = active.some(record => record.cancels.size > 0);
-            if (inFlight || (active.length > 0 && (hooks.length === 0 || hooks.some(hook => hook.reload)))) requiresReload = true;
+            if (inFlight || active.some(record => record.googlePreset)
+                || (active.length > 0 && (hooks.length === 0 || hooks.some(hook => hook.reload)))) requiresReload = true;
             for (const record of active) {
                 for (const cancel of [...record.cancels]) cancel();
                 for (const node of record.nodes) node.remove();
@@ -201,6 +219,7 @@
         if (JSON.stringify(next) === JSON.stringify(current)) return;
         const previous = current;
         current = snapshot(next);
+        updateGoogle();
         // Previous choices were validated when installed. Expiry must still revoke code that ran earlier.
         const revoked = knownCategories.filter(key => key !== 'necessary' && previous.decidedAt !== null
             && previous.choices[key] && !permits(current, key));
@@ -309,16 +328,17 @@
         script.async = false;
         script.textContent = original.textContent;
         if (url !== null) script.src = url.href;
-        // Inline modules do not reliably emit a load event. An epilogue runs after their imports and top-level await.
-        const moduleEvent = type === 'module' && url === null
+        // Module load events can precede top-level await. Completion comes from an evaluated epilogue.
+        const moduleEvent = type === 'module'
             ? `consent:module-complete:${crypto.getRandomValues(new Uint32Array(4)).join('-')}` : null;
-        if (moduleEvent !== null) script.textContent += `\n;document.dispatchEvent(new Event(${JSON.stringify(moduleEvent)}));`;
+        if (moduleEvent !== null && url === null) script.textContent += `\n;document.dispatchEvent(new Event(${JSON.stringify(moduleEvent)}));`;
         record.nodes.push(script);
         if (executable) record.started = true;
         const waits = url !== null || type === 'module';
         const result = new Promise((resolve, reject) => {
             let settled = false;
             let timer = null;
+            let moduleMarker = null;
             const settle = error => {
                 if (settled) return;
                 settled = true;
@@ -327,18 +347,36 @@
                 script.removeEventListener('load', loaded);
                 script.removeEventListener('error', failed);
                 document.removeEventListener('securitypolicyviolation', blocked);
-                if (moduleEvent !== null) document.removeEventListener(moduleEvent, loaded);
-                if (error) { script.remove(); reject(error); } else resolve(true);
+                if (moduleEvent !== null) document.removeEventListener(moduleEvent, completed);
+                moduleMarker?.removeEventListener('error', failed);
+                if (error) { script.remove(); moduleMarker?.remove(); reject(error); } else resolve(true);
             };
-            const loaded = () => settle();
+            const completed = () => settle();
+            const loaded = () => {
+                if (type !== 'module') { settle(); return; }
+                if (url === null || moduleMarker !== null) return;
+                // The original fetch enforces SRI/credentials. Import its cached module to await evaluation without running it twice.
+                moduleMarker = document.createElement('script');
+                moduleMarker.type = 'module';
+                if (nonce) moduleMarker.nonce = nonce;
+                for (const name of ['crossorigin', 'referrerpolicy']) {
+                    if (original.hasAttribute(name)) moduleMarker.setAttribute(name, original.getAttribute(name));
+                }
+                moduleMarker.textContent = `import ${JSON.stringify(url.href)};\ndocument.dispatchEvent(new Event(${JSON.stringify(moduleEvent)}));`;
+                moduleMarker.addEventListener('error', failed);
+                record.nodes.push(moduleMarker);
+                try { (document.head ?? document.documentElement).appendChild(moduleMarker); }
+                catch (error) { settle(error); }
+            };
             const failed = () => settle(new Error('Consent script failed to load or was blocked.'));
             const blocked = event => {
                 if (event.disposition === 'enforce' && event.effectiveDirective?.startsWith('script-src')
-                    && (event.target === script || (!waits && event.blockedURI === 'inline'))) failed();
+                    && (event.target === script || event.target === moduleMarker
+                        || ((!waits || moduleMarker !== null) && event.blockedURI === 'inline'))) failed();
             };
             const cancel = () => { const error = new Error('Consent was revoked while loading.'); error.name = 'AbortError'; settle(error); };
             document.addEventListener('securitypolicyviolation', blocked);
-            if (moduleEvent !== null) document.addEventListener(moduleEvent, loaded, { once: true });
+            if (moduleEvent !== null) document.addEventListener(moduleEvent, completed, { once: true });
             if (waits) {
                 record.cancels.add(cancel);
                 script.addEventListener('load', loaded);
@@ -360,6 +398,7 @@
 
     async function drain() {
         if (!ready || reloading) return;
+        await drainGoogle();
         scan();
         for (const record of records.values()) {
             sync();
@@ -385,8 +424,108 @@
         loadQueue = loadQueue.then(drain).catch(error => report('loader', error));
     }
 
+    const googleRecords = new Map();
+    const googleConfigured = new Set();
+    let googleLoaded = false;
+    let googleFailed = false;
+    let googlePrevious = null;
+    let googleCommand = null;
+
+    function googleSignals(state) {
+        const analytics = permits(state, 'analytics') ? 'granted' : 'denied';
+        const marketing = permits(state, 'marketing') ? 'granted' : 'denied';
+        return { analytics_storage: analytics, ad_storage: marketing, ad_user_data: marketing, ad_personalization: marketing,
+            functionality_storage: 'denied', security_storage: 'granted', personalization_storage: marketing };
+    }
+
+    function updateGoogle() {
+        if (!googleCommand) return;
+        const signals = googleSignals(current);
+        for (const target of config.google.targets.filter(target => target.category === 'analytics')) {
+            window[`ga-disable-${target.id}`] = config.google.mode === 'basic'
+                ? signals.analytics_storage === 'denied'
+                : googlePrevious?.analytics_storage === 'granted' && signals.analytics_storage === 'denied'
+                    || window[`ga-disable-${target.id}`] === true && signals.analytics_storage === 'denied';
+        }
+        if (JSON.stringify(signals) !== JSON.stringify(googlePrevious)) {
+            googleCommand('consent', 'update', signals);
+            googlePrevious = signals;
+        }
+    }
+
+    if (config.google != null) {
+        const layer = window.dataLayer ?? [];
+        window.dataLayer = layer;
+        googleCommand = function () { layer.push(arguments); };
+        window.gtag = googleCommand;
+        googleCommand('consent', 'default', googleSignals(pending()));
+        googleCommand('set', 'ads_data_redaction', true);
+        googleCommand('set', 'url_passthrough', false);
+        updateGoogle();
+    }
+
+    async function drainGoogle() {
+        if (!googleCommand || googleFailed || reloading) return;
+        sync();
+        const advanced = config.google.mode === 'advanced';
+        const target = config.google.targets.find(target => advanced || canRun(target.category));
+        if (!target) return;
+        try {
+            if (!googleLoaded) {
+                const record = { id: 'google-tag', category: advanced ? 'necessary' : target.category,
+                    started: false, nodes: [], cancels: new Set(), googlePreset: true };
+                googleRecords.set(record.id, record);
+                const script = document.createElement('script');
+                script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(target.id)}`;
+                googleCommand('js', new Date());
+                if (!await execute(script, record)) return;
+                googleLoaded = true;
+            }
+            for (const target of config.google.targets) {
+                sync();
+                if (reloading || googleConfigured.has(target.id) || !advanced && !canRun(target.category)) continue;
+                googleCommand('config', target.id, target.category === 'analytics'
+                    ? { send_page_view: target.sendPageView, allow_google_signals: false, allow_ad_personalization_signals: false }
+                    : { allow_ad_personalization_signals: false });
+                googleConfigured.add(target.id);
+                googleRecords.set(target.id, { id: target.id, category: target.category,
+                    started: true, nodes: [], cancels: new Set(), googlePreset: true });
+            }
+        } catch (error) {
+            googleFailed = true;
+            if (error.name !== 'AbortError') report('google', error);
+        }
+    }
+
+    const googleApi = Object.freeze({
+        state: () => { sync(); return Object.freeze(googleSignals(current)); },
+        event: (destination, name, parameters = {}) => operation(async () => {
+            if (typeof destination !== 'string' || typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(name)
+                || !parameters || typeof parameters !== 'object' || Array.isArray(parameters)
+                || Object.hasOwn(parameters, 'send_to') || Object.hasOwn(parameters, 'event_callback')) {
+                throw new TypeError('Google events require a destination, event name, and parameters without send_to or event_callback.');
+            }
+            const target = config.google?.targets.find(target => target.id === destination
+                || target.category === 'marketing' && destination.startsWith(`${target.id}/`)
+                    && /^[A-Za-z0-9_-]{1,128}$/.test(destination.slice(target.id.length + 1)));
+            if (!target || target.category === 'marketing' && (name !== 'conversion' || destination === target.id)) {
+                throw new TypeError('Unknown Google destination or missing Ads conversion label.');
+            }
+            sync();
+            if (!canRun(target.category)) return false;
+            await initialized;
+            schedule();
+            await loadQueue;
+            sync();
+            if (!canRun(target.category) || !googleConfigured.has(target.id) || googleFailed) return false;
+            googleCommand('event', name, { ...parameters, send_to: destination });
+            return true;
+        }),
+    });
+
     const api = {
         __consentForLaravel: true,
+        google: googleApi,
         state: () => snapshot(sync()),
         allowed: category => { checkCategory(category); sync(); return category === 'necessary' || canRun(category); },
         choose,

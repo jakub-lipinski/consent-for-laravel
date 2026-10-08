@@ -31,6 +31,7 @@ final readonly class BrowserRuntime
             ], is_string(...)))),
             'scriptTimeoutMs' => $this->settings->scriptTimeoutMs,
             'cleanupTimeoutMs' => $this->settings->cleanupTimeoutMs,
+            'google' => (new GoogleSettings($this->configuration->get('consent.google', []), $this->configuration->get('consent.presets', [])))->toArray(),
         ];
     }
 

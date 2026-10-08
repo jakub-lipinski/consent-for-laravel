@@ -28,6 +28,7 @@
                 <button type="button" class="consent-icon-button" data-consent-action="dismiss" aria-label="{{ $ui->text('dismiss', $language) }}"><span aria-hidden="true">&times;</span></button>
             </div>
             <p>{{ $ui->text('banner_description', $language) }}</p>
+            @if($ui->advancedGoogle())<p>{{ $ui->text('google_advanced', $language) }}</p>@endif
             @if($policy !== null)<a class="consent-policy" href="{{ $policy }}">{{ $ui->text('policy_link', $language) }}</a>@endif
             <p class="consent-error" role="alert" data-consent-error hidden></p>
         </div>
@@ -44,6 +45,7 @@
                 <button type="button" class="consent-icon-button" data-consent-action="close" aria-label="{{ $ui->text('close', $language) }}"><span aria-hidden="true">&times;</span></button>
             </header>
             <p class="consent-description">{{ $ui->text('preferences_description', $language) }}</p>
+            @if($ui->advancedGoogle())<p class="consent-description">{{ $ui->text('google_advanced', $language) }}</p>@endif
             <p class="consent-error" role="alert" data-consent-error hidden></p>
             <fieldset class="consent-categories">
                 <legend class="consent-sr-only">{{ $ui->text('categories_label', $language) }}</legend>

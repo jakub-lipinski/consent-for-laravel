@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'google_advanced' => 'Tagi Google wysyłają również sygnały pomiarowe bez cookies przed dokonaniem wyboru oraz po odmowie opcjonalnych cookies.',
+    'presets' => [
+        'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Pomiar wizyt i korzystania ze strony.'],
+        'google-ads' => ['name' => 'Google Ads', 'description' => 'Pomiar konwersji reklamowych i zarządzanie sygnałami zgody reklamowej.'],
+    ],
     'banner_title' => 'Twoja prywatność jest ważna',
     'banner_description' => 'Używamy niezbędnych cookies do działania strony. Za Twoją zgodą korzystamy też z opcjonalnych cookies w celach opisanych w preferencjach. W każdej chwili możesz zmienić swój wybór.',
     'accept_all' => 'Akceptuj wszystkie',
