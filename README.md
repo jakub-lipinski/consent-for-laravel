@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.0.0`.** Includes Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.1.0`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Google presets
 
@@ -93,10 +93,11 @@ A visitor without a current decision sees the banner. Accept and reject have equ
 
 After a saved choice, a small cookie icon reopens preferences. A saved refusal stays remembered. With no optional services, only the icon is shown, allowing visitors to read the necessary category. Withdrawing an active category uses the runtime's cleanup and default reload behavior.
 
-### Position, language, policy, and colors
+### Variant, position, language, policy, and colors
 
 ```php
 'ui' => [
+    'variant' => 'standard',    // standard or compact; banner and preferences dialog
     'position' => 'bottom-left', // bottom-left, bottom-right, bottom-center
     'locale' => null,           // Follow the app locale; or explicitly en / pl
     'policy_url' => '/cookies',
@@ -107,12 +108,14 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
 ],
 ```
 
-Left and right use a compact white card with a light shadow. Center uses a wide horizontal layout on larger screens; all variants stack on small screens. Text retains sentence case and the action buttons have space between them. The launcher follows the chosen position.
+`standard` preserves the original spacious card and preferences dialog. `compact` uses smaller cards/dialogs, less spacing, simpler corners, outlined choice buttons, and side-by-side acceptance/refusal on wider screens. Category purposes stay visible; complete service lists are available through native, keyboard-accessible disclosures in each category. Both keep the same wording, actions, and consent behavior. Acceptance and refusal remain equally prominent. Compact changes presentation only and does not shorten purpose disclosures.
+
+Both variants support all three positions and validated colors. Left and right use a card; center uses a wide horizontal layout on larger screens. Actions stack on small screens, and long content scrolls vertically. The launcher follows the chosen position. Omitted `variant` settings in existing published configurations default to `standard`.
 
 The application locale selects Polish for `pl`, including `pl_PL` / `pl-PL`, and English otherwise. An explicit UI locale must be `en` or `pl`. Per-component overrides are available:
 
 ```blade
-<x-consent::banner locale="pl" position="bottom-right" policy-url="/cookies" />
+<x-consent::banner variant="compact" locale="pl" position="bottom-right" policy-url="/cookies" />
 ```
 
 `policy_url` accepts an absolute website path or an HTTP(S) URL without credentials; null omits the link. Provide your site's actual cookie policy. Colors accept six-digit hex values. The available defaults are:
@@ -128,7 +131,7 @@ The application locale selects Polish for `pl`, including `pl_PL` / `pl-PL`, and
 | `control` | `#67776e` | Outlined controls and unchecked switches |
 | `focus` | `#245c49` | Keyboard focus outline |
 
-The renderer rejects invalid colors and combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. Custom CSS and published view changes require their own accessibility checks. Changing layout, colors, or UI language does not invalidate a decision.
+The renderer rejects invalid colors and combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. Custom CSS and published view changes require their own accessibility checks. Changing variant, position, colors, or UI language does not invalidate or extend a decision.
 
 ### Translations and custom openers
 
@@ -418,7 +421,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.0.0.md) for this release's scope.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.0.md) for this release's scope and upgrade steps.
 
 ## License
 

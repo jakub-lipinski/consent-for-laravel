@@ -38,7 +38,7 @@ Restore `composer.json` to the intended library constraints after testing. Do no
 - Document implemented features separately from planned capabilities.
 - Verify Google and EU requirements against primary sources when implementing consent behavior. Do not describe the unfinished package as compliant.
 
-Beta.3 includes service metadata, consent state, versioned cookie persistence, `@consent`, a framework-free browser loader, and the accessible English/Polish interface. It registers no application routes or database schema. New server decision endpoints must remain in the host application and use its normal validation and CSRF protection.
+The stable version 1 series includes service metadata, consent state, versioned cookie persistence, `@consent`, a framework-free browser loader, the English/Polish interface, and Google/Meta/Clarity integrations. Version 1.1 adds Standard and Compact variants for both the banner and preferences dialog. Variant selection is presentation-only and must preserve purpose descriptions, service details, equal choice prominence, draft behavior, keyboard access, and saved decisions. The package registers no application routes or database schema. New server decision endpoints must remain in the host application and use its normal validation and CSRF protection.
 
 JavaScript tests cover consent transitions, strict cookie validation, resource failures, ordering, duplicate blocks/sources, storage failures, cleanup, expiry, SPA fragments, and actual serialization through PHP. Set `CONSENT_TEST_PHP` to select the PHP executable used by the serialization and Blade interface fixtures when needed.
 

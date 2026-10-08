@@ -2,10 +2,14 @@
 
 use ConsentForLaravel\ConsentForLaravel\BannerSettings;
 use ConsentForLaravel\ConsentForLaravel\BannerView;
+use ConsentForLaravel\ConsentForLaravel\ConsentCodec;
 use ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider;
+use ConsentForLaravel\ConsentForLaravel\ConsentManager;
 use ConsentForLaravel\ConsentForLaravel\ServiceRegistry;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\ViewException;
 
 function bannerServices(): array
 {
@@ -16,11 +20,11 @@ function bannerServices(): array
     ];
 }
 
-it('renders a single cache-safe interface with only registered categories and service purposes', function () {
-    config(['consent.services' => bannerServices()]);
+it('renders a single cache-safe interface with only registered categories and service purposes', function (string $variant) {
+    config(['consent.services' => bannerServices(), 'consent.ui.variant' => $variant]);
     $html = Blade::render('<x-consent::banner /><x-consent::banner />');
     expect(substr_count($html, 'data-consent-ui data-'))->toBe(1)
-        ->and($html)->toContain('id="consent-category-necessary"', 'id="consent-category-analytics"', 'id="consent-category-marketing"', 'Measure visits.', 'Measure conversions.')
+        ->and($html)->toContain('data-consent-variant="'.$variant.'"', 'id="consent-category-necessary"', 'id="consent-category-analytics"', 'id="consent-category-marketing"', 'Measure visits.', 'Measure conversions.')
         ->not->toContain('id="consent-category-performance"', 'id="consent-category-other"', 'Unused', '"choices":');
     $dom = new DOMDocument;
     @$dom->loadHTML($html);
@@ -28,13 +32,42 @@ it('renders a single cache-safe interface with only registered categories and se
     expect($xpath->query('//input[@id="consent-category-necessary" and @checked and @disabled]')->length)->toBe(1)
         ->and($xpath->query('//input[not(@id="consent-category-necessary") and @checked]')->length)->toBe(0)
         ->and($xpath->query('//dialog[@aria-labelledby="consent-preferences-title"]')->length)->toBe(1);
+})->with(['standard', 'compact']);
+
+it('preserves the standard default and supports variant overrides for the whole interface', function () {
+    expect((new BannerSettings([]))->variant)->toBe('standard');
+    expect(Blade::render('<x-consent::banner />'))->toContain('data-consent-variant="standard"');
+
+    config(['consent.ui.variant' => 'compact']);
+    expect(Blade::render('<x-consent::banner />'))->toContain('data-consent-variant="compact"');
+    expect(Blade::render('<x-consent::banner variant="standard" />'))->toContain('data-consent-variant="standard"');
 });
 
-it('supports the three positions without generating visitor-specific output', function (string $position) {
-    config(['consent.ui.position' => $position]);
+it('preserves saved grants and refusals when the interface variant changes', function (bool $allowed) {
+    config(['consent.services' => bannerServices()]);
+    $decision = app(ConsentManager::class)->choose(['analytics' => $allowed]);
+    $cookie = app(ConsentCodec::class)->encode($decision);
+    $request = Request::create('https://example.test/', cookies: ['consent_preferences' => $cookie]);
+
+    config(['consent.ui.variant' => 'compact']);
+    $restored = app(ConsentManager::class)->read($request);
+
+    expect($restored->hasDecision())->toBeTrue()
+        ->and($restored->allows('analytics'))->toBe($allowed)
+        ->and($restored->decidedAt)->toBe($decision->decidedAt)
+        ->and($restored->expiresAt)->toBe($decision->expiresAt);
+})->with([true, false]);
+
+it('rejects an invalid variant supplied through the component', function () {
+    expect(fn () => Blade::render('<x-consent::banner variant="unknown" />'))
+        ->toThrow(ViewException::class, 'Consent variant must be standard or compact.');
+});
+
+it('supports the three positions without generating visitor-specific output', function (string $position, string $variant) {
+    config(['consent.ui.position' => $position, 'consent.ui.variant' => $variant]);
     $html = Blade::render('<x-consent::banner />');
     expect($html)->toContain('data-consent-position="'.$position.'"');
-})->with(['bottom-left', 'bottom-right', 'bottom-center']);
+})->with(['bottom-left', 'bottom-right', 'bottom-center'])->with(['standard', 'compact']);
 
 it('uses Polish or English with deterministic app-locale fallback and component overrides', function () {
     app()->setLocale('pl_PL');
@@ -94,6 +127,8 @@ it('validates UI configuration and rejects unsafe or inaccessible themes', funct
     expect(fn () => new BannerSettings($ui))->toThrow(InvalidArgumentException::class);
 })->with([
     [null], [false], [['unexpected' => true]], [['position' => 'center']], [['position' => null]],
+    [['variant' => null]], [['variant' => '']], [['variant' => 'Compact']], [['variant' => 'full']],
+    [['variant' => true]], [['variant' => 1]], [['variant' => []]],
     [['locale' => 'de']], [['locale' => []]], [['policy_url' => 'javascript:alert(1)']], [['policy_url' => '//example.test']],
     [['policy_url' => 'https://user:password@example.test']], [['policy_url' => '/\\example.test']], [['policy_url' => ' /cookies']],
     [['colors' => null]], [['colors' => ['unknown' => '#000000']]], [['colors' => ['accent' => 'red']]],

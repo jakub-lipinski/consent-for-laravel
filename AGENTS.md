@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository is a Composer library, `jakub-lipinski/consent-for-laravel`, not a Laravel application. Version 1.0 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, a three-position banner, a native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2, Basic/explicit Advanced gtag.js modes, and GA4/Google Ads presets are included. Meta Pixel and Microsoft Clarity presets are included with strict browser gating and mandatory reload after active withdrawal. Clarity advertising is opt-in and separately gated by marketing permission.
+This repository is a Composer library, `jakub-lipinski/consent-for-laravel`, not a Laravel application. Version 1.1 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, Standard/Compact variants of the three-position banner and native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2, Basic/explicit Advanced gtag.js modes, and GA4/Google Ads presets are included. Meta Pixel and Microsoft Clarity presets are included with strict browser gating and mandatory reload after active withdrawal. Clarity advertising is opt-in and separately gated by marketing permission.
 
 ## Conventions
 
@@ -13,6 +13,7 @@ This repository is a Composer library, `jakub-lipinski/consent-for-laravel`, not
 - Keep configuration serializable and compatible with Laravel configuration caching.
 - Keep consent reads stateless and free of persistence side effects. Optional categories are denied without a current, valid decision.
 - Keep Blade templates inert, independent of visitor preferences, and compatible with HTML caching. Gate scripts in the browser and recheck permission before each activation.
+- Keep UI variants presentation-only, with the same consent actions, purposes, service details, and keyboard behavior. Missing variant configuration defaults to standard.
 - Preserve script ordering and deduplication. Removing a script cannot stop running code; default to reload on active revocation unless the owner supplies complete cooperative cleanup.
 - The browser-readable preference cookie is not an authorization mechanism or a database audit trail. Keep session and CSRF cookies encrypted.
 - Do not add unused example facades, commands, migrations, or infrastructure.

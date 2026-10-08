@@ -155,10 +155,35 @@
 .consent-dialog__footer [data-consent-action="save"] { grid-column: 1 / -1; }
 .consent-fallback { padding: 1rem; background: var(--consent-background); border: 1px solid var(--consent-border); }
 .consent-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px !important; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.consent-ui[data-consent-variant="compact"] .consent-banner {
+    width: min(24rem, calc(100% - 3rem));
+    padding: 1rem;
+    border-radius: .6rem;
+    box-shadow: none;
+}
+.consent-ui[data-consent-variant="compact"] h2 { font-size: 1.125rem; }
+.consent-ui[data-consent-variant="compact"] .consent-banner__content { gap: .4rem; }
+.consent-ui[data-consent-variant="compact"] .consent-actions { gap: .5rem; margin-block-start: .85rem; }
+.consent-ui[data-consent-variant="compact"] .consent-banner .consent-actions { grid-template-columns: 1fr 1fr; }
+.consent-ui[data-consent-variant="compact"] .consent-banner [data-consent-action="open"] { grid-column: 1 / -1; }
+.consent-ui[data-consent-variant="compact"] .consent-button { min-height: 2.75rem; padding: .6rem .75rem; border-radius: .4rem; }
+.consent-ui[data-consent-variant="compact"] .consent-button--choice { background: var(--consent-background); color: var(--consent-accent); }
+.consent-ui[data-consent-variant="compact"][data-consent-position="bottom-center"] .consent-banner { width: min(60rem, calc(100% - 3rem)); }
+.consent-ui[data-consent-variant="compact"] .consent-dialog { width: min(34rem, calc(100% - 3rem)); padding: 1.25rem; border-radius: .6rem; }
+.consent-ui[data-consent-variant="compact"] .consent-description { margin-block: .6rem .85rem; }
+.consent-ui[data-consent-variant="compact"] .consent-category { padding-block: .75rem; }
+.consent-service-details { margin-block-start: .25rem; }
+.consent-service-details summary { min-height: 2.75rem; padding-block: .5rem; color: var(--consent-accent); font-size: .8125rem; font-weight: 600; cursor: pointer; }
+.consent-service-details summary:hover { text-decoration: underline; text-underline-offset: .2em; }
+.consent-ui[data-consent-variant="compact"] .consent-services { margin-block-start: .5rem; }
+.consent-ui[data-consent-variant="compact"] .consent-services li + li { margin-block-start: .4rem; }
+.consent-ui[data-consent-variant="compact"] .consent-dialog__footer { padding-block-start: .5rem; }
 @media (min-width: 60rem) {
     .consent-ui[data-consent-position="bottom-center"] .consent-banner { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 2rem; }
     .consent-ui[data-consent-position="bottom-center"] .consent-banner .consent-actions { margin: 0; grid-template-columns: 1fr 1fr; }
     .consent-ui[data-consent-position="bottom-center"] .consent-banner [data-consent-action="open"] { grid-column: 1 / -1; }
+    .consent-ui[data-consent-variant="compact"][data-consent-position="bottom-center"] .consent-banner { gap: 1rem; }
+    .consent-ui[data-consent-variant="compact"][data-consent-position="bottom-center"] .consent-banner .consent-actions { margin: 0; }
 }
 @media (max-width: 35rem) {
     .consent-banner, .consent-dialog { width: calc(100% - 1.5rem); padding: clamp(.75rem, 4vw, 1.15rem); max-height: calc(100dvh - 1.5rem); border-radius: .85rem; }
@@ -168,6 +193,10 @@
     .consent-ui .consent-icon-button { flex-basis: 44px; min-width: 44px; min-height: 44px; }
     .consent-dialog__footer .consent-actions { grid-template-columns: 1fr; }
     .consent-category__required { flex-basis: 100%; order: 3; }
+    .consent-ui[data-consent-variant="compact"] .consent-banner,
+    .consent-ui[data-consent-variant="compact"] .consent-dialog { width: calc(100% - 1.5rem); padding: clamp(.75rem, 3vw, 1rem); }
+    .consent-ui[data-consent-variant="compact"][data-consent-position="bottom-center"] .consent-banner { width: calc(100% - 1.5rem); }
+    .consent-ui[data-consent-variant="compact"] .consent-banner .consent-actions { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .consent-ui *, .consent-ui *::before, .consent-ui *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 @media (forced-colors: active) {

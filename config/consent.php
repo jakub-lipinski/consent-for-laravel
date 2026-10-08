@@ -22,6 +22,8 @@ return [
     ],
 
     'ui' => [
+        // Applies to both the banner and the preferences dialog.
+        'variant' => 'standard', // standard or compact
         'position' => 'bottom-left',
         // null uses the application's locale, with English as the fallback.
         'locale' => null,

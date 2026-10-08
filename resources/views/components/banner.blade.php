@@ -1,8 +1,9 @@
-@props(['nonce' => null, 'locale' => null, 'position' => null, 'policyUrl' => null, 'styleSrc' => null, 'scriptSrc' => null])
+@props(['nonce' => null, 'locale' => null, 'variant' => null, 'position' => null, 'policyUrl' => null, 'styleSrc' => null, 'scriptSrc' => null])
 @once
 @php
     $ui = app(\ConsentForLaravel\ConsentForLaravel\BannerView::class);
     $language = $ui->locale($locale);
+    $appearance = \ConsentForLaravel\ConsentForLaravel\BannerSettings::variant($variant ?? $ui->settings->variant);
     $placement = \ConsentForLaravel\ConsentForLaravel\BannerSettings::position($position ?? $ui->settings->position);
     $policy = \ConsentForLaravel\ConsentForLaravel\BannerSettings::policyUrl($policyUrl ?? $ui->settings->policyUrl);
 @endphp
@@ -14,7 +15,7 @@
 @if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS)
 <style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{{ '}' }}</style>
 @endif
-<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" lang="{{ $language }}" dir="ltr"
+<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" lang="{{ $language }}" dir="ltr"
      data-message-saving="{{ $ui->text('saving', $language) }}" data-message-saved="{{ $ui->text('saved', $language) }}"
      data-message-changed="{{ $ui->text('changed', $language) }}" data-message-error="{{ $ui->text('save_failed', $language) }}"
      data-message-leave="{{ $ui->text('leave_page', $language) }}">
@@ -60,11 +61,16 @@
                     </div>
                     <p id="consent-description-{{ $category->value }}">{{ $ui->text('categories.'.$category->value.'.description', $language) }}</p>
                     @if($ui->services->forCategory($category) !== [])
+                    @if($appearance === 'compact')
+                    <details class="consent-service-details">
+                        <summary>{{ $ui->text('services_label', $language) }}</summary>
+                    @endif
                     <ul class="consent-services" aria-label="{{ $ui->text('services_label', $language) }}">
                         @foreach($ui->services->forCategory($category) as $service)
                         <li><strong>{{ $ui->serviceText($service, 'name', $language) }}</strong><span>{{ $ui->serviceText($service, 'description', $language) }}</span></li>
                         @endforeach
                     </ul>
+                    @if($appearance === 'compact')</details>@endif
                     @endif
                 </div>
                 @endforeach

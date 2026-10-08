@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.0 - Standard and Compact interfaces
+
+### Added
+
+- `consent.ui.variant` with validated `standard` and `compact` values, and a `variant` Blade component override.
+- A matching Compact banner and preferences dialog with less spacing, simpler corners, outlined choice buttons, responsive actions, and native service-list disclosures. Category purposes remain visible and complete service details stay available.
+- Coverage for defaults, overrides, invalid values, configuration caching, saved-decision compatibility, SPA remounting, and both variants/languages in semantic accessibility checks.
+
+### Upgrade Notes
+
+- Standard preserves the original interface and remains the default for existing published configurations. UI variant changes do not invalidate or extend saved choices.
+- Merge `ui.variant` into published configuration, update customized banner views, and republish/cache-bust assets when served separately. Rebuild configuration/view caches and restart persistent workers.
+- See [complete release notes](docs/releases/v1.1.0.md) and the [interface guide](docs/interface.md).
+
 ## v1.0.0 - Cookie consent for Laravel
 
 - Composer package: `jakub-lipinski/consent-for-laravel`.

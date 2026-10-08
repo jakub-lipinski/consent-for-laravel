@@ -261,28 +261,66 @@ test('an unsupported dialog preserves a valid saved preference while explaining 
     assert.match(p.root.querySelector('[data-consent-fallback]').textContent, /preferences are unavailable/);
 });
 
-test('SPA replacement removes stale listeners and mounts the new banner once', async t => {
+test('SPA replacement mounts a different variant once and preserves the current decision', async t => {
     const p = await page(t);
+    await p.api.choose({ analytics: true });
     p.root.remove();
     await tick();
-    p.doc.body.insertAdjacentHTML('beforeend', fixture({}).banner);
+    p.doc.body.insertAdjacentHTML('beforeend', fixture({ ui: { variant: 'compact' } }).banner);
     await tick();
     const next = p.doc.querySelector('[data-consent-ui]');
-    assert.equal(next.querySelector('[data-consent-banner]').hidden, false);
+    assert.equal(next.dataset.consentVariant, 'compact');
+    assert.equal(next.querySelector('[data-consent-banner]').hidden, true);
     assert.equal(p.api.openPreferences(), true);
     assert.equal(next.querySelector('dialog').open, true);
+    assert.equal(next.querySelector('[data-consent-category="analytics"]').checked, true);
 });
 
-for (const locale of ['en', 'pl']) {
-    test(`axe structural WCAG checks pass for ${locale} banner and modal`, async t => {
-        const p = await page(t, { input: { locale } });
-        p.window.eval(axe.source);
-        const options = { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
-            rules: { 'color-contrast': { enabled: false }, 'target-size': { enabled: false } } };
-        for (const modal of [false, true]) {
-            if (modal) p.api.openPreferences();
-            const result = await p.window.axe.run(p.doc, options);
-            assert.deepEqual(plain(result.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))), []);
-        }
-    });
+test('compact preferences keep draft changes, keyboard dismissal, saving, reopening, and withdrawal', async t => {
+    const p = await page(t, { input: { ui: { variant: 'compact' }, locale: 'pl' } });
+    assert.equal(p.root.dataset.consentVariant, 'compact');
+    p.button('open').focus();
+    p.button('open').click();
+    const details = p.dialog.querySelector('.consent-service-details');
+    assert.equal(details.open, false);
+    details.querySelector('summary').click();
+    assert.equal(details.open, true);
+    assert.match(details.textContent, /Statistics|Campaigns/);
+    assert.equal(p.window.document.cookie, '');
+    p.field('analytics').click();
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.window.document.cookie, '');
+    p.dialog.dispatchEvent(new p.window.Event('cancel', { cancelable: true }));
+    assert.equal(p.doc.activeElement, p.button('open'));
+    p.button('open').click();
+    assert.equal(p.field('analytics').checked, false);
+    p.field('analytics').click();
+    p.button('save', true).click();
+    await idle(p);
+    assert.equal(p.api.allowed('analytics'), true);
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.doc.activeElement, p.launcher);
+    p.launcher.click();
+    assert.equal(p.field('analytics').checked, true);
+    p.button('reject', true).click();
+    await idle(p);
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.state().decidedAt !== null, true);
+    assert.equal(p.launcher.hidden, false);
+});
+
+for (const variant of ['standard', 'compact']) {
+    for (const locale of ['en', 'pl']) {
+        test(`axe structural WCAG checks pass for ${variant} ${locale} banner and modal`, async t => {
+            const p = await page(t, { input: { locale, ui: { variant } } });
+            p.window.eval(axe.source);
+            const options = { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
+                rules: { 'color-contrast': { enabled: false }, 'target-size': { enabled: false } } };
+            for (const modal of [false, true]) {
+                if (modal) p.api.openPreferences();
+                const result = await p.window.axe.run(p.doc, options);
+                assert.deepEqual(plain(result.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))), []);
+            }
+        });
+    }
 }

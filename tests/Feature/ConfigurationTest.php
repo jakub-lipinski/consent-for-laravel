@@ -1,5 +1,6 @@
 <?php
 
+use ConsentForLaravel\ConsentForLaravel\BannerSettings;
 use ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider;
 use ConsentForLaravel\ConsentForLaravel\ConsentSettings;
 use ConsentForLaravel\ConsentForLaravel\ServiceRegistry;
@@ -103,6 +104,7 @@ it('caches custom service and cookie configuration without closures or objects',
     $configuration = require dirname(__DIR__, 2).'/config/consent.php';
     $configuration['policy_version'] = 'policy-2';
     $configuration['cookie']['name'] = 'cached_consent';
+    $configuration['ui']['variant'] = 'compact';
     $configuration['services'] = ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']];
     $configPath = config_path('consent.php');
     $cachePath = $this->app->getCachedConfigPath();
@@ -114,6 +116,7 @@ it('caches custom service and cookie configuration without closures or objects',
 
         expect($cached)->toBe($configuration)
             ->and((new ConsentSettings($cached))->cookieName)->toBe('cached_consent')
+            ->and((new BannerSettings($cached['ui']))->variant)->toBe('compact')
             ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics');
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);

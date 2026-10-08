@@ -17,6 +17,8 @@ final readonly class BannerSettings
         'focus' => '#245c49',
     ];
 
+    public string $variant;
+
     public string $position;
 
     public ?string $locale;
@@ -28,11 +30,12 @@ final readonly class BannerSettings
 
     public function __construct(mixed $configuration)
     {
-        if (! is_array($configuration) || array_diff(array_keys($configuration), ['position', 'locale', 'policy_url', 'colors']) !== []) {
-            throw new InvalidArgumentException('consent.ui must contain only position, locale, policy_url, and colors.');
+        if (! is_array($configuration) || array_diff(array_keys($configuration), ['variant', 'position', 'locale', 'policy_url', 'colors']) !== []) {
+            throw new InvalidArgumentException('consent.ui must contain only variant, position, locale, policy_url, and colors.');
         }
 
-        $configuration += ['position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => []];
+        $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => []];
+        $this->variant = self::variant($configuration['variant']);
         $this->position = self::position($configuration['position']);
         if ($configuration['locale'] !== null && ! in_array($configuration['locale'], ['en', 'pl'], true)) {
             throw new InvalidArgumentException('consent.ui.locale must be null, en, or pl.');
@@ -58,6 +61,15 @@ final readonly class BannerSettings
         if (self::contrast($this->colors['accent_text'], $this->colors['accent']) < 4.5) {
             throw new InvalidArgumentException('Consent accent_text requires at least 4.5:1 contrast against accent.');
         }
+    }
+
+    public static function variant(mixed $variant): string
+    {
+        if (! in_array($variant, ['standard', 'compact'], true)) {
+            throw new InvalidArgumentException('Consent variant must be standard or compact.');
+        }
+
+        return $variant;
     }
 
     public static function position(mixed $position): string
