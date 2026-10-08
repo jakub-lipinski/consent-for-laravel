@@ -47,7 +47,7 @@ it('rejects invalid Google and preset settings even before publication', functio
     expect(fn () => new GoogleSettings($google, $presets))->toThrow(InvalidArgumentException::class);
 })->with([
     [false, []], [['mode' => 'unknown'], []], [['mode' => null], []], [['enabled' => 'true'], []], [['unexpected' => true], []],
-    [[], ['ga4' => false]], [[], ['gtm' => []]], [[], ['ga4' => ['enabled' => true]]],
+    [[], ['ga4' => false]], [[], ['ga4' => null]], [[], ['gtm' => []]], [[], ['ga4' => ['enabled' => true]]],
     [[], ['ga4' => ['enabled' => 1]]], [[], ['ga4' => ['enabled' => null]]], [[], ['ga4' => ['measurement_id' => 'G-X"</script>']]],
     [[], ['ga4' => ['measurement_id' => 'AW-123']]], [[], ['ga4' => ['send_page_view' => 'false']]],
     [[], ['ga4' => ['cookie_path' => 'relative']]], [[], ['ga4' => ['cookie_domain' => 'https://example.test']]],

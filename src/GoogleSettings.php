@@ -37,7 +37,7 @@ final readonly class GoogleSettings
         $targets = [];
         $services = [];
         foreach (['ga4', 'google_ads'] as $preset) {
-            $definition = $presets[$preset] ?? [];
+            $definition = array_key_exists($preset, $presets) ? $presets[$preset] : [];
             $idKey = $preset === 'ga4' ? 'measurement_id' : 'conversion_id';
             $allowed = ['enabled', $idKey, 'name', 'description', 'cookie_path', 'cookie_domain'];
             if ($preset === 'ga4') {
