@@ -40,7 +40,7 @@ async function page(t, options = {}) {
             options.before?.(window);
         },
     });
-    t.after(() => dom.window.close());
+    t.after(async () => { await dom.window.Consent?.whenIdle(); dom.window.close(); });
     if (dom.window.document.readyState === 'loading') await new Promise(resolve => dom.window.document.addEventListener('DOMContentLoaded', resolve, { once: true }));
     if (dom.window.Consent) await dom.window.Consent.whenIdle();
     await tick();
@@ -241,6 +241,32 @@ test('the banner collapses if it would hide keyboard focus on the host page', as
     p.doc.querySelector('#custom').focus();
     assert.equal(p.launcher.hidden, false);
     assert.equal(p.api.state().decidedAt, null);
+});
+
+test('focus on a page container overlapping the banner preserves the pending interface', async t => {
+    const p = await page(t);
+    const main = p.doc.querySelector('main');
+    main.tabIndex = -1;
+    main.getBoundingClientRect = () => ({ left: 0, right: 1200, top: 0, bottom: 8000, width: 1200, height: 8000 });
+    const box = { left: 800, right: 1180, top: 500, bottom: 780, width: 380, height: 280 };
+    p.banner.getBoundingClientRect = () => box;
+    p.launcher.getBoundingClientRect = () => ({ left: 1130, right: 1180, top: 730, bottom: 780, width: 50, height: 50 });
+    main.focus();
+    assert.equal(p.banner.hidden, false);
+    assert.equal(p.api.state().decidedAt, null);
+    await p.api.rejectOptional();
+    assert.equal(p.launcher.hidden, false);
+    assert.equal(p.doc.activeElement, main);
+});
+
+test('partially covered host focus does not dismiss the pending banner', async t => {
+    const p = await page(t);
+    p.banner.getBoundingClientRect = () => ({ left: 50, right: 150, top: 0, bottom: 100, width: 100, height: 100 });
+    const outside = p.doc.querySelector('#outside');
+    outside.getBoundingClientRect = () => ({ left: 0, right: 100, top: 0, bottom: 100, width: 100, height: 100 });
+    outside.focus();
+    assert.equal(p.banner.hidden, false);
+    assert.equal(p.doc.activeElement, outside);
 });
 
 for (const setting of ['noJavaScript', 'noCore', 'noDialog']) {

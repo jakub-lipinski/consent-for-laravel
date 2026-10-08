@@ -789,6 +789,75 @@ window.clarityCommands = Array.from(clarity.q, args => Array.from(args));
 window.clarity = function () { clarityCommands.push(Array.from(arguments)); };
 `;
 const trackerFiles = { '/en_US/fbevents.js': metaFixture, '/tag/abc123def4': clarityFixture };
+
+for (const preset of ['google', 'meta', 'clarity']) {
+    const send = p => preset === 'google' ? p.api.google.event('G-ABCD1234', 'regression_event')
+        : preset === 'meta' ? p.api.meta.trackCustom('regression_event') : p.api.clarity.event('regression_event');
+    test(`${preset} pending event cannot delay refusal or dispatch after withdrawal`, async t => {
+        const p = await page(t, { config: { google: googleConfig(), trackers: trackerConfig() }, files: {
+            ...trackerFiles, '/gtag/js': 'hang',
+        } });
+        await p.api.acceptAll();
+        const event = send(p);
+        await delay(0);
+        const refusal = p.api.rejectOptional();
+        const state = await Promise.race([refusal, delay(100).then(() => null)]);
+        assert.ok(state, 'refusal must finish without waiting for the SDK timeout');
+        assert.equal(state.choices.analytics, false);
+        assert.equal(state.choices.marketing, false);
+        assert.equal(await event, false);
+        await p.api.whenIdle();
+        assert.equal(commands(p).some(args => args[0] === 'event'), false);
+        assert.equal(p.window.metaCommands, undefined);
+        assert.equal(p.window.clarityCommands, undefined);
+        assert.deepEqual(p.reloads, [{ reason: 'revocation' }]);
+    });
+
+    test(`${preset} event waits for its preset without waiting for a custom script`, async t => {
+        const p = await page(t, { config: { google: googleConfig(), trackers: trackerConfig() },
+            files: { ...googleFiles, ...trackerFiles, '/custom.js': 'hang' },
+            html: block('custom', 'analytics', '<script src="/custom.js"></script>') });
+        await p.api.acceptAll();
+        for (let attempt = 0; !p.loader.requests.includes('/custom.js') && attempt < 100; attempt++) await delay(1);
+        assert.ok(p.loader.requests.includes('/custom.js'));
+        const result = await Promise.race([send(p), delay(100).then(() => null)]);
+        assert.equal(result, true, 'ready SDK events must not depend on custom script completion');
+        await p.api.rejectOptional();
+        await p.api.whenIdle();
+        assert.equal(p.errors.some(error => /timed out/.test(error.message)), false);
+    });
+}
+
+test('a repeated timeout stops automatic reloads until that script completes successfully', async t => {
+    const memory = new Map();
+    const before = window => Object.defineProperty(window, 'sessionStorage', { value: {
+        getItem: key => memory.get(key) ?? null,
+        setItem: (key, value) => memory.set(key, value),
+        removeItem: key => memory.delete(key),
+    } });
+    const config = configuration({ scriptTimeoutMs: 10 });
+    const state = decision(config);
+    const html = block('slow', 'analytics', '<script src="/slow.js"></script>');
+    const first = await page(t, { config, state, html, before, files: { '/slow.js': 'hang' } });
+    assert.deepEqual(first.reloads, [{ reason: 'script-timeout' }]);
+    const second = await page(t, { config, state, html, before, files: { '/slow.js': 'hang' } });
+    assert.deepEqual(second.reloads, [{ reason: 'script-timeout', automatic: false }]);
+    assert.equal(await second.api.google.event('G-ABCD1234', 'test').catch(() => false), false);
+    const recovered = await page(t, { config, state, html, before, files: { '/slow.js': 'order.push("recovered")' } });
+    assert.deepEqual(plain(recovered.window.order), ['recovered']);
+    const again = await page(t, { config, state, html, before, files: { '/slow.js': 'hang' } });
+    assert.deepEqual(again.reloads, [{ reason: 'script-timeout' }]);
+});
+
+test('a timeout with unavailable retry storage requests a manual reload', async t => {
+    const config = configuration({ scriptTimeoutMs: 10 });
+    const p = await page(t, { config, state: decision(config),
+        html: block('slow', 'analytics', '<script src="/slow.js"></script>'), files: { '/slow.js': 'hang' },
+        before(window) { Object.defineProperty(window, 'sessionStorage', { value: {
+            getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); },
+        } }); } });
+    assert.deepEqual(p.reloads, [{ reason: 'script-timeout', automatic: false }]);
+});
 const trackerServices = [
     { id: 'meta-pixel', category: 'marketing', cookies: [ { name: '_fbp', prefix: null, path: '/', domain: null }, { name: '_fbc', prefix: null, path: '/', domain: null } ] },
     { id: 'microsoft-clarity', category: 'analytics', cookies: [ { name: '_clck', prefix: null, path: '/', domain: null }, { name: '_clsk', prefix: null, path: '/', domain: null } ] },

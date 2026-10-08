@@ -24,8 +24,8 @@
         const on = (target, name, callback) => target.addEventListener(name, callback, { signal: events.signal });
         const announce = key => { status.textContent = root.dataset[`message${key}`] ?? ''; };
         const selection = state => fields.forEach(field => { field.checked = state.choices[field.dataset.consentCategory] === true; });
-        const intersects = (one, two) => one.width > 0 && one.height > 0 && two.width > 0 && two.height > 0
-            && one.left < two.right && one.right > two.left && one.top < two.bottom && one.bottom > two.top;
+        const covers = (overlay, focus) => overlay.width > 0 && overlay.height > 0 && focus.width > 0 && focus.height > 0
+            && overlay.left <= focus.left && overlay.right >= focus.right && overlay.top <= focus.top && overlay.bottom >= focus.bottom;
         const error = message => {
             lastError = message;
             for (const node of root.querySelectorAll('[data-consent-error]')) { node.textContent = message; node.hidden = message === ''; }
@@ -35,7 +35,7 @@
             launcher.hidden = dialog.open || !banner.hidden;
             if (!root.contains(document.activeElement) && document.activeElement instanceof Element
                 && document.activeElement !== document.body && document.activeElement !== document.documentElement) {
-                launcher.hidden ||= intersects(launcher.getBoundingClientRect(), document.activeElement.getBoundingClientRect());
+                launcher.hidden ||= covers(launcher.getBoundingClientRect(), document.activeElement.getBoundingClientRect());
             }
         }
         function restoreFocus(preferred) {
@@ -135,7 +135,7 @@
         });
         on(document, 'focusin', event => {
             if (dialog.open || root.contains(event.target) || !(event.target instanceof Element)) return;
-            if (!banner.hidden && intersects(banner.getBoundingClientRect(), event.target.getBoundingClientRect())) dismissed = true;
+            if (!banner.hidden && covers(banner.getBoundingClientRect(), event.target.getBoundingClientRect())) dismissed = true;
             reveal();
         });
         on(document, 'consent:error', event => {

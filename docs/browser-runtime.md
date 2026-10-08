@@ -15,7 +15,7 @@ With no JavaScript, templates stay inert. The directive does not inspect request
 
 Only script elements, comments, and whitespace are supported. HTTP and HTTPS source URLs are accepted. Classic JavaScript types, `module`, `application/json`, and `application/ld+json` are supported. Data scripts are copied as inert data after consent; they cannot have a source URL. Modern browsers skip `nomodule` scripts. Attributes such as integrity, crossorigin, referrerpolicy, and nonce are retained. `async` and `defer` are removed so the loader owns ordering.
 
-A failed resource, synchronous inline error, unsupported script, or CSP rejection stops the rest of its block and emits an error. Other independent blocks can continue. Blocks do not retry automatically. A timeout requests a reload because removing an in-flight script cannot guarantee that it will never execute. Asynchronous work started by a tracker remains the tracker owner's responsibility.
+A failed resource, synchronous inline error, unsupported script, or CSP rejection stops the rest of its block and emits an error. Other independent blocks can continue. Blocks do not retry in the same document. A timeout requests a reload because removing an in-flight script cannot guarantee that it will never execute. The same script receives at most one automatic timeout reload per tab until it completes successfully. A repeated timeout, or unavailable session storage for the retry marker, emits `consent:reload-required` with `automatic: false` and stops further activation. The host can explain the failure and offer a manual reload. Asynchronous work started by a tracker remains the tracker owner's responsibility.
 
 ## Public API
 
@@ -33,9 +33,11 @@ All methods are on `window.Consent`. Optional categories must be registered befo
 | `refresh()` | Promise: synchronize a server or another tab's decision and await cleanup |
 | `onChange(callback)` | Register `(current, previous, source)`; return an unsubscribe function |
 | `onRevoke(category, callback, options?)` | Register cleanup receiving the denied state; return an unsubscribe function |
-| `whenIdle()` | Promise: await DOM readiness and current decision, cleanup, and loading queues |
+| `whenIdle()` | Promise: await DOM readiness and current decision, cleanup, preset, script, and event queues |
 
 Decision promises resolve after persistence and cleanup, independently of loading newly allowed scripts. Use `whenIdle()` when testing or when you need to wait for those scripts. It does not await asynchronous tasks spawned by application callbacks or vendor code.
+
+Preset event helpers have their own ordered queue. They await preset initialization, independently of custom script completion, and recheck consent before dispatch. A pending event never blocks saving a decision or withdrawing consent. Modules inside `@consent` may await the Google, Meta, and Clarity event helpers; do not await `whenIdle()` inside a gated module, because it includes that module's own completion.
 
 ```js
 try {
@@ -97,7 +99,7 @@ Events are dispatched on `document`:
 | `consent:ready` | `{ current }` at DOM initialization |
 | `consent:change` | `{ current, previous, source }` |
 | `consent:error` | `{ code, message, block }`; `block` is nullable |
-| `consent:reload-required` | `{ reason }`, or `{ reason, automatic: false }` if denial cannot survive reload |
+| `consent:reload-required` | `{ reason }`, or `{ reason, automatic: false }` if denial cannot survive reload or an automatic timeout retry is unsafe/repeated |
 
 Change sources are `choice`, `forget`, `refresh`, or `storage-error`. Error codes cover configuration, namespace collision, invalid/conflicting blocks, scripts, storage, cookie cleanup, lifecycle callbacks, and reload. Listen early if you need startup errors:
 

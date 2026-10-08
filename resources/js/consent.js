@@ -139,7 +139,9 @@
     let markReady;
     const initialized = new Promise(resolve => { markReady = resolve; });
     let operations = Promise.resolve();
+    let eventQueue = Promise.resolve();
     let cleanupQueue = Promise.resolve();
+    let presetQueue = Promise.resolve();
     let loadQueue = Promise.resolve();
     const records = new Map();
     const sources = new Map();
@@ -154,11 +156,15 @@
         if (!knownCategories.includes(category)) throw new TypeError(`Unknown consent category [${category}].`);
     }
 
-    function reload(reason) {
+    function reload(reason, automatic = true) {
         if (reloading) return;
         reloading = true;
         if (storageFailed && !rememberDenial()) {
             report('storage-denial', new Error('A refusal cannot be remembered across reloads. Leave this document to stop already running code.'));
+            emit('reload-required', { reason, automatic: false });
+            return;
+        }
+        if (!automatic) {
             emit('reload-required', { reason, automatic: false });
             return;
         }
@@ -277,6 +283,13 @@
         return result;
     }
 
+    function eventOperation(callback) {
+        // Pending SDK events cannot hold up persisting a withdrawal.
+        const result = eventQueue.then(callback);
+        eventQueue = result.catch(() => {});
+        return result;
+    }
+
     function choose(choices) {
         return operation(async () => {
             if (reloading) throw new Error('A consent reload is in progress.');
@@ -356,6 +369,8 @@
         record.nodes.push(script);
         if (executable) record.started = true;
         const waits = url !== null || type === 'module';
+        const retryKey = `consent:script-timeout:${JSON.stringify([denialScope, config.policyVersion, config.servicesVersion,
+            record.id, record.template ? [...record.template.content.children].indexOf(original) : 'preset'])}`;
         const result = new Promise((resolve, reject) => {
             let settled = false;
             let timer = null;
@@ -370,7 +385,11 @@
                 document.removeEventListener('securitypolicyviolation', blocked);
                 if (moduleEvent !== null) document.removeEventListener(moduleEvent, completed);
                 moduleMarker?.removeEventListener('error', failed);
-                if (error) { script.remove(); moduleMarker?.remove(); reject(error); } else resolve(true);
+                if (error) { script.remove(); moduleMarker?.remove(); reject(error); }
+                else {
+                    try { sessionStorage.removeItem(retryKey); } catch {}
+                    resolve(true);
+                }
             };
             const completed = () => settle();
             const loaded = () => {
@@ -402,7 +421,18 @@
                 record.cancels.add(cancel);
                 script.addEventListener('load', loaded);
                 script.addEventListener('error', failed);
-                timer = setTimeout(() => { failed(); reload('script-timeout'); }, config.scriptTimeoutMs);
+                timer = setTimeout(() => {
+                    // Remember one retry across documents; repeated failures need manual recovery.
+                    let retry = false;
+                    try {
+                        if (sessionStorage.getItem(retryKey) !== '1') {
+                            sessionStorage.setItem(retryKey, '1');
+                            retry = sessionStorage.getItem(retryKey) === '1';
+                        }
+                    } catch {}
+                    failed();
+                    reload('script-timeout', retry);
+                }, config.scriptTimeoutMs);
             }
             // Classic inline code executes during insertion. Stop dependent scripts if it throws.
             const inlineError = event => settle(event.error ?? new Error(event.message));
@@ -419,8 +449,6 @@
 
     async function drain() {
         if (!ready || reloading) return;
-        await drainGoogle();
-        await drainTrackers();
         scan();
         for (const record of records.values()) {
             sync();
@@ -441,9 +469,20 @@
         }
     }
 
+    function schedulePresets() {
+        // Custom modules may await event helpers, so preset readiness must exclude those modules.
+        if (!ready || reloading) return presetQueue;
+        presetQueue = presetQueue.then(async () => {
+            await drainGoogle();
+            await drainTrackers();
+        }).catch(error => report('loader', error));
+        return presetQueue;
+    }
+
     function schedule() {
         if (!ready || reloading) return;
-        loadQueue = loadQueue.then(drain).catch(error => report('loader', error));
+        const presets = schedulePresets();
+        loadQueue = loadQueue.then(async () => { await presets; await drain(); }).catch(error => report('loader', error));
     }
 
     const googleRecords = new Map();
@@ -542,12 +581,11 @@
                 const data = JSON.parse(JSON.stringify(parameters));
                 sync();
                 const permitted = canRun(target.category);
-                return operation(async () => {
+                return eventOperation(async () => {
                     sync();
                     if (!permitted || !canRun(target.category)) return false;
                     await initialized;
-                    schedule();
-                    await loadQueue;
+                    await schedulePresets();
                     sync();
                     if (!canRun(target.category) || !googleConfigured.has(target.id) || googleFailed) return false;
                     googleCommand('event', name, { ...data, send_to: destination });
@@ -659,8 +697,7 @@
         sync();
         if (!canRun(category)) return false;
         await initialized;
-        schedule();
-        await loadQueue;
+        await schedulePresets();
         sync();
         if (!canRun(category) || !trackerLoaded.has(preset) || trackerFailed.has(preset)) return false;
         trackerCommand(preset, ...args);
@@ -687,7 +724,7 @@
             const eventOptions = { ...options };
             sync();
             const permitted = canRun('marketing');
-            return operation(() => {
+            return eventOperation(() => {
                 if (!config.trackers.meta) throw new TypeError('The meta preset is not enabled.');
                 return permitted ? trackerEvent('meta', [method, name, data, eventOptions]) : false;
             });
@@ -705,7 +742,7 @@
                 eventName(name);
                 sync();
                 const permitted = canRun('analytics');
-                return operation(() => {
+                return eventOperation(() => {
                     if (!config.trackers.clarity) throw new TypeError('The clarity preset is not enabled.');
                     return permitted ? trackerEvent('clarity', ['event', name]) : false;
                 });
@@ -761,9 +798,10 @@
             await initialized;
             let previous;
             do {
-                previous = [operations, cleanupQueue, loadQueue];
+                previous = [operations, cleanupQueue, presetQueue, loadQueue, eventQueue];
                 await Promise.all(previous);
-            } while (previous[0] !== operations || previous[1] !== cleanupQueue || previous[2] !== loadQueue);
+            } while (previous[0] !== operations || previous[1] !== cleanupQueue || previous[2] !== presetQueue
+                || previous[3] !== loadQueue || previous[4] !== eventQueue);
             return snapshot(current);
         },
     };

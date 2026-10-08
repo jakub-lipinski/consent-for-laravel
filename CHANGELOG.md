@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.2 - Reliable focus and consent withdrawal
+
+- Clicking or focusing a large page container no longer hides the pending banner and its launcher. Overlays still yield to fully covered host-page controls.
+- Pending Google, Meta, and Clarity events no longer delay saving a refusal or withdrawal. Consent is rechecked before dispatch, independently of SDK loading.
+- Gated modules may await preset event helpers without waiting on their own completion. Presets and custom scripts retain ordered, deduplicated loading.
+- The same script timeout triggers at most one automatic reload per tab until that script succeeds; repeated timeouts or unavailable retry storage request manual recovery.
+- Update/cache-bust both browser scripts when serving published assets. Configuration, translations, cookie schema, fingerprints, and saved decisions remain compatible.
+- See [release notes](docs/releases/v1.1.2.md).
+
 ## v1.1.1 - Service disclosures in both variants
 
 - Standard and Compact both use initially collapsed, independently expandable service lists in every populated category. Category purposes remain visible.

@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating. Install the stable package from [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel); [GitHub](https://github.com/jakub-lipinski/consent-for-laravel) hosts its source and releases.
 
-**Current release: `v1.1.1`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.1.2`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Requirements
 
@@ -494,7 +494,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.1.md) for this release's scope and upgrade steps.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.2.md) for this release's scope and upgrade steps.
 
 ## License
 

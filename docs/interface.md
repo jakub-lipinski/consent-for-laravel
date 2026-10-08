@@ -28,7 +28,7 @@ The initial banner is a named section, not a modal, and does not autofocus. A na
 
 On dismissal or save, focus returns to the opener when it remains visible; otherwise it moves to the reopening icon. A delayed native close event does not pull focus back from another page control. There is no keyboard trap preventing dismissal and no positive tabindex.
 
-An overlay must not obscure keyboard focus on the host website. If focus moves to a page control underneath the banner, the banner collapses to its icon without making a decision. If that icon would also cover the focused control, it is temporarily hidden until focus moves away. The active page control retains focus. A `data-consent-open` footer or privacy-page button is an additional convenient route to preferences.
+An overlay must not entirely obscure keyboard focus on the host website. If focus moves to a page control fully covered by the banner, the banner collapses to its icon without making a decision. If that icon would also fully cover the focused control, it is temporarily hidden until focus moves away. Large page containers and partially visible controls do not dismiss the notice. The active page control retains focus. A `data-consent-open` footer or privacy-page button is an additional convenient route to preferences.
 
 The modal scrolls vertically; its footer is not sticky and cannot cover focused controls. Labels, category descriptions, a fieldset legend, service lists, named close buttons, and a labelled reopening SVG support the accessibility tree. Decorative SVGs and the close glyph are hidden from assistive technology. Long structured modal content is not flattened into a single `aria-describedby` announcement.
 
