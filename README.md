@@ -1,20 +1,89 @@
 # Consent for Laravel
 
-A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
+A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating. Install the stable package from [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel); [GitHub](https://github.com/jakub-lipinski/consent-for-laravel) hosts its source and releases.
 
 **Current release: `v1.1.1`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
-## Google presets
+## Requirements
 
-Enable GA4 in `config/consent.php` and set your measurement ID:
+- PHP 8.3+.
+- Laravel 12-13.
+- Composer 2.
+- Laravel service provider auto-discovery.
+- No database, migrations, frontend framework, or Node build step.
+
+The package supplies consent components for the consuming application's layout. Documentation and presentation websites belong in a separate repository. Installation adds no standalone website, dashboard, or application routes.
+
+## Installation
+
+Run these commands in the root of the Laravel application where you want to use consent, alongside its `composer.json` and `artisan` files:
+
+```bash
+composer require jakub-lipinski/consent-for-laravel
+php artisan vendor:publish --tag=consent-config
+```
+
+Composer resolves a compatible stable release directly from [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel). No VCS entry, Git clone, or minimum-stability change is needed. Laravel discovers the provider automatically. Commit the application's `composer.json` and `composer.lock`; deploy with `composer install` to reproduce the locked version. Check your installed release with:
+
+```bash
+composer show jakub-lipinski/consent-for-laravel
+```
+
+Publishing `consent-config` creates `config/consent.php`. All presets are disabled and custom `services` is empty by default. With both components mounted and no optional purpose enabled, only the preferences launcher appears. Enable the presets you use and supply their IDs, or register and gate your custom scripts.
+
+The default components embed the installed JavaScript and CSS, and include English/Polish translations without publishing them. Publish `consent-assets` only for separate browser files, `consent-views` for markup overrides, or `consent-translations` for wording changes. The package does not register routes. Use the built-in Blade interface, the browser API with your own interface, or the PHP API from your application's controllers or services.
+
+For earlier VCS installs, see [switching to Packagist](#switching-from-vcs). For discovery or publishing problems, see [installation troubleshooting](#installation-troubleshooting).
+
+## Quick start with GA4
+
+After [installation](#installation), edit the existing `ga4` entry under `presets` in `config/consent.php`. The following is an excerpt; keep the other settings and presets:
 
 ```php
 'presets' => [
-    'ga4' => ['enabled' => true, 'measurement_id' => env('CONSENT_GA4_ID')],
+    'ga4' => [
+        'enabled' => true,
+        'measurement_id' => env('CONSENT_GA4_ID'),
+        'send_page_view' => true,
+    ],
 ],
 ```
 
-The existing head/banner components register the analytics purpose and initialize GA4 after a valid grant, with no Google requests before permission in the default Basic mode. Google Ads uses `presets.google_ads.enabled` and `conversion_id`. Optional Advanced mode explicitly permits cookieless pings before permission.
+Set your actual measurement ID in the consuming application's `.env` or production environment:
+
+```dotenv
+CONSENT_GA4_ID=G-XXXXXXXXXX
+```
+
+All presets start disabled. Setting an ID alone does not enable a preset: `enabled` must be the boolean `true`. Add the components to the shared Blade layout used by your pages:
+
+```blade
+<head>
+    <x-consent::head />
+</head>
+<body>
+    {{-- Your application content --}}
+    <x-consent::banner />
+</body>
+```
+
+Place the head before any vendor code or code using `window.Consent`. The enabled preset registers the analytics purpose, and the browser runtime initializes GA4 after a valid grant, with no Google requests before permission in the default Basic mode. A preset needs no manual service definition or `@consent` wrapper. Remove duplicate GA4 snippets and installations.
+
+Set `ui.policy_url` to your existing cookie policy URL, or create a page in your app and use its path, for example `/cookies`. The package does not create a policy route. Choose `ui.variant` (`standard` or `compact`), position, colors, and language as described under [the banner](#add-the-banner).
+
+After editing configuration or `.env`, clear any cached configuration locally:
+
+```bash
+php artisan config:clear
+```
+
+During production deployment, rebuild with `php artisan config:cache` after environment values are set and restart long-running workers. Reload the browser page to receive the updated settings.
+
+Verify a fresh private session before consent, refusal followed by reload, acceptance, and active withdrawal. In Basic mode GA4 should make no tag or measurement request before analytics permission or after refusal. A saved grant starts it; withdrawing after initialization reloads by default. Check the actual Network panel, policy link, keyboard interaction, and your own staging property.
+
+### Google presets
+
+Google Ads uses `presets.google_ads.enabled` and `conversion_id`, supplied by `CONSENT_GOOGLE_ADS_ID`. Optional Advanced mode explicitly permits cookieless pings before permission.
 
 ```javascript
 await Consent.google.event('AW-123456789/YOUR_CONVERSION_LABEL', 'conversion', {
@@ -25,6 +94,8 @@ await Consent.google.event('AW-123456789/YOUR_CONVERSION_LABEL', 'conversion', {
 Use your registered destination and actual conversion label. The helper refuses events without permission and does not replay them later. Read the [complete Google integration guide](docs/google.md) for modes, mappings, setup, SPA page views, CSP, cookie scopes, and withdrawal limits.
 
 ## Meta Pixel and Microsoft Clarity
+
+Edit the existing entries below, keeping any other presets you use, and supply their IDs through `CONSENT_META_PIXEL_ID` / `CONSENT_CLARITY_ID` in your application's environment. An ID alone does not enable either preset:
 
 ```php
 'presets' => [
@@ -43,36 +114,9 @@ await Consent.clarity.event('checkout-completed');
 
 Helpers check permission at invocation and dispatch and never replay denied calls. Active withdrawal signals denial before reload and removes declared visible first-party cookies. See the [complete tracker guide](docs/tracker-presets.md) for setup, SPA events, masking, advertising, CSP, scopes, and upgrade notes.
 
-## Requirements
-
-- PHP 8.3+.
-- Laravel 12-13.
-- Laravel service provider auto-discovery.
-- No database, migrations, frontend framework, or Node build step.
-
-The package supplies consent components for the consuming application's layout. Documentation and presentation websites belong in a separate repository. Installation adds no standalone website, dashboard, or application routes.
-
-## Installation
-
-Install the stable GitHub release in your Laravel application with Composer. Register the official VCS source once; the package is not currently indexed on Packagist:
-
-```bash
-composer config repositories.consent vcs https://github.com/jakub-lipinski/consent-for-laravel.git
-composer require jakub-lipinski/consent-for-laravel:^1.1.1
-php artisan vendor:publish --tag=consent-config
-```
-
-Composer resolves stable Git tags and records the installed version in your application's lockfile; no reduced minimum stability is needed. No manual provider registration is required. Configure the package in `config/consent.php`, then rebuild your application's configuration cache if it is enabled:
-
-```bash
-php artisan config:cache
-```
-
-The package does not register routes. Use the built-in Blade interface, the browser API with your own interface, or the PHP API from your application's controllers or services.
-
 ## Add the banner
 
-Register the optional services used by your website as described below, then add two components to your main layout:
+For custom scripts, [register their optional services](#register-services), then use the head/banner layout with gated script blocks as shown below. Built-in presets use the same components and manage their own SDK loading; they need no extra block:
 
 ```blade
 <head>
@@ -412,6 +456,34 @@ The provider excludes only the configured preference cookie from Laravel's encry
 The cookie stores preferences and version/timestamp metadata, without identity, IP address, or a visitor identifier. It is unsigned and user-editable: use it only for consent preferences, never authentication, authorization, or evidence of who made a decision. Malformed, incomplete, future-dated, overlong, expired, or incompatible values fail closed. The package has no database audit trail.
 
 Responses passed to `persist()` or `forget()` receive `Cache-Control: private, no-store`. Do not share-cache personalized server-rendered consent output. Rebuild configuration and restart long-running workers after configuration changes. If the cookie name, path, or domain changes, old cookies must be cleaned up using their old scope; the new scope cannot delete them.
+
+## Updating an existing installation
+
+Review [release notes](https://github.com/jakub-lipinski/consent-for-laravel/releases) and [Packagist versions](https://packagist.org/packages/jakub-lipinski/consent-for-laravel), then update within your application's allowed constraint:
+
+```bash
+composer update jakub-lipinski/consent-for-laravel
+```
+
+Commit the resulting lock file and deploy with `composer install`. Merge new options into `config/consent.php`, keeping your IDs, descriptions, cookie scopes, policy version, and UI choices. Compare customized published views and translations with the new package; do not force-publish over application customizations. Republish and cache-bust separate assets when used, refresh config/view caches, and restart persistent workers. Inline components use the installed sources directly.
+
+### Switching from VCS
+
+If you followed the previous guide and added `repositories.consent`, remove that entry before resolving the package from Packagist:
+
+```bash
+composer config --unset repositories.consent
+composer update jakub-lipinski/consent-for-laravel
+```
+
+If you used another key, remove that entry instead. Preserve repositories for intentional forks or local package development, and keep the package in `require`. No minimum-stability change, uninstall, or cookie migration is needed. Published configuration and customizations stay in place. Commit both Composer files.
+
+## Installation troubleshooting
+
+- **Composer cannot find the package:** use the exact name `jakub-lipinski/consent-for-laravel`, check PHP/Laravel requirements, and run `composer diagnose` or `composer show --all jakub-lipinski/consent-for-laravel`. Check network access, private mirrors, and whether Packagist is disabled. If metadata predates publication, run `composer clear-cache` and retry.
+- **No publishable resources for `consent-config`:** confirm installation with `composer show`. If Composer scripts were disabled, run `composer dump-autoload` and `php artisan package:discover`. Check `extra.laravel.dont-discover` in the app's `composer.json`; if you intentionally disable discovery, add `ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider::class` to its existing `bootstrap/providers.php` array.
+- **An ID is set but the tracker does not start:** enable its preset with boolean `true`, refresh cached configuration, and reload. Pending or denied categories keep optional SDKs inactive. Check duplicate vendor snippets, the correct category, browser console/network errors, and CSP.
+- **Only the preferences icon appears:** the default config has no optional service. Enable a preset or register a custom service; a saved acceptance or refusal also shows the launcher rather than the initial notice.
 
 ## Development
 

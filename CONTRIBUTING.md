@@ -2,6 +2,8 @@
 
 ## Setup and checks
 
+These commands develop the library itself. To add consent to a Laravel application, use [the Packagist installation](README.md#installation) instead. For package development, clone [the source repository](https://github.com/jakub-lipinski/consent-for-laravel) and run the following in its root:
+
 ```bash
 composer install
 npm ci --ignore-scripts
@@ -46,4 +48,4 @@ Native browser verification uses a disposable host Laravel application outside t
 
 UI tests use real Blade output and axe structural checks. Contrast and target size are disabled only in jsdom, which has no layout; run the full axe checks and manual keyboard/reflow checks in the disposable host application. jsdom also cannot prove CSP or module execution behavior. Use local mock providers during verification.
 
-Stable releases use semantic version tags. Use prerelease tags for changes still undergoing validation, and mark stable GitHub releases as the latest release. Keep `CHANGELOG.md`, `README.md`, and the corresponding `docs/releases/` note accurate. The Composer version comes from the Git tag, never a hard-coded `version` field. Verify the exported archive in a disposable consumer before publishing.
+Stable releases use semantic version tags. Use prerelease tags for changes still undergoing validation, and mark stable GitHub releases as the latest release. Keep `CHANGELOG.md`, `README.md`, and the corresponding `docs/releases/` note accurate. The Composer version comes from the Git tag, never a hard-coded `version` field. Verify the exported archive in a disposable consumer before publishing. After publication, check that [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel) exposes the intended stable version and source commit, and verify installation without a custom Composer repository. Consumer instructions should use `composer require jakub-lipinski/consent-for-laravel`; local path repositories are for development verification.

@@ -4,10 +4,11 @@ The package provides a gtag.js consent bridge and built-in GA4 / Google Ads init
 
 ## Quick setup
 
-Publish the configuration and enable the required preset in `config/consent.php`:
+First [install the package from Packagist and publish its configuration](../README.md#installation). Edit the existing preset entries in `config/consent.php`, keeping any other presets you use:
 
 ```php
 'presets' => [
+    // Preserve the other preset entries from the published configuration.
     'ga4' => [
         'enabled' => true,
         'measurement_id' => env('CONSENT_GA4_ID'),
@@ -25,7 +26,9 @@ CONSENT_GA4_ID=G-XXXXXXXXXX
 CONSENT_GOOGLE_ADS_ID=AW-123456789
 ```
 
-Replace the example IDs with your own. Either preset can be enabled independently. No manual service definition, vendor bootstrap, or `@consent` block is needed for a preset:
+Set these values in the consuming application's `.env` or production environment and replace the example IDs with your own. Either preset can be enabled independently; leave an unused one disabled. An ID alone does not enable a preset: `enabled` must be the boolean `true`. Leave `google.enabled` at its default `null` for automatic bridge activation and `google.mode` at `basic` for loading only after permission. Run `php artisan config:clear` locally after configuration or environment changes; during deployment, rebuild with `php artisan config:cache` and restart long-running workers. Reload the browser page.
+
+No manual service definition, vendor bootstrap, or `@consent` block is needed for a preset:
 
 ```blade
 <head>

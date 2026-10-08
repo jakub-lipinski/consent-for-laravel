@@ -4,7 +4,7 @@ The package provides optional ID-based presets. Both stay disabled by default an
 
 ## Setup
 
-Merge these settings into your published `config/consent.php`:
+First [install the package from Packagist and publish its configuration](../README.md#installation). Edit the existing entries in `config/consent.php`, keeping the other options and presets:
 
 ```php
 'presets' => [
@@ -27,7 +27,9 @@ CONSENT_META_PIXEL_ID=123456789012345
 CONSENT_CLARITY_ID=abc123def4
 ```
 
-Replace these examples with your own IDs. Meta IDs must be strings of 1-20 digits, starting with 1-9. Clarity IDs must be strings of 1-32 lowercase letters/digits. Enabled presets require their ID; booleans must be actual booleans. Disabled definitions are validated too. Never use an access token in these browser-visible fields.
+Set these values in your application's `.env` or production environment and replace the examples with your own IDs. Meta IDs must be strings of 1-20 digits, starting with 1-9. Clarity IDs must be strings of 1-32 lowercase letters/digits. Enabled presets require their ID; booleans must be actual booleans. An ID alone does not enable a preset. Enable only the integrations you use. Disabled definitions are validated too. Never use an access token in these browser-visible fields.
+
+After configuration or environment changes, run `php artisan config:clear` locally. During production deployment, rebuild with `php artisan config:cache` and restart long-running workers, then reload the browser page. Presets register their own purposes and SDKs; they need no manual service definitions.
 
 Continue using the existing layout:
 

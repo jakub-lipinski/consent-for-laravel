@@ -2,6 +2,12 @@
 
 Version 1.1 provides matching Standard and Compact interfaces through `<x-consent::banner />` alongside the head/runtime component. Both use ordinary HTML, scoped CSS, native checkbox controls, and a native `<dialog>` with no frontend framework. They target the applicable WCAG 2.2 A and AA criteria of this interface; the package does not certify an entire website or replace a site accessibility review.
 
+## Setup
+
+Follow [installation and configuration](../README.md#installation), then place `<x-consent::head />` in the shared layout's head and `<x-consent::banner />` in its body. The default components embed the package's assets, so no npm build or resource publication is needed for the interface. Set `ui.policy_url` to a real page in your application; the package does not create that route.
+
+Presets are disabled and custom services are empty after installation. Enable the presets you use with their IDs or register your own optional services; without an optional purpose, only the preferences launcher appears. Publishing views or translations is optional and only needed for file customization. Refresh cached configuration after changing UI settings.
+
 ## Visitor behavior
 
 - A pending decision shows the banner with Accept all, Reject optional, and Manage preferences. Acceptance and rejection use the same size, color, and hierarchy.
