@@ -2,7 +2,27 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.0.0-beta.3`.** This beta adds three banner positions, a preferences modal, a reopening icon, validated theme colors, and English/Polish translations. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. Google Consent Mode v2 and tracker presets remain planned. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.0.0-beta.4`.** This beta adds Google Consent Mode v2, GA4 and Google Ads presets, guarded event routing, and Basic/explicit Advanced modes. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. GTM, Meta Pixel, and Clarity remain planned. The package does not certify the accessibility or EU legal compliance of the host website.
+
+## Google presets
+
+Enable GA4 in `config/consent.php` and set your measurement ID:
+
+```php
+'presets' => [
+    'ga4' => ['enabled' => true, 'measurement_id' => env('CONSENT_GA4_ID')],
+],
+```
+
+The existing head/banner components register the analytics purpose and initialize GA4 after a valid grant, with no Google requests before permission in the default Basic mode. Google Ads uses `presets.google_ads.enabled` and `conversion_id`. Optional Advanced mode explicitly permits cookieless pings before permission.
+
+```javascript
+await Consent.google.event('AW-123456789/YOUR_CONVERSION_LABEL', 'conversion', {
+    transaction_id: 'order-123', value: 49.90, currency: 'PLN',
+});
+```
+
+Use your registered destination and actual conversion label. The helper refuses events without permission and does not replay them later. Read the [complete Google integration guide](docs/google.md) for modes, mappings, setup, SPA page views, CSP, cookie scopes, and withdrawal limits.
 
 ## Requirements
 
@@ -386,12 +406,12 @@ Responses passed to `persist()` or `forget()` receive `Cache-Control: private, n
 
 ## Next betas
 
-- `beta.4`: Google Consent Mode v2, GA4, and Google Ads.
+- `beta.4` (implemented): Google Consent Mode v2, GA4, and Google Ads.
 - `beta.5`: GTM bridge, consent template, and container configuration.
 - `beta.6`: Meta Pixel and Microsoft Clarity.
 - `beta.7`: integrated verification, documentation, and release preparation.
 
-These are planned milestones. More betas can be released for fixes before `v1.0.0`. The head and banner views, interface translations, and browser assets can be published.
+These are implemented and planned milestones. More betas can be released for fixes before `v1.0.0`. The head and banner views, interface translations, and browser assets can be published.
 
 ## Development
 
@@ -402,7 +422,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the beta release notes](docs/releases/v1.0.0-beta.3.md) for this release's scope.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the beta release notes](docs/releases/v1.0.0-beta.4.md) for this release's scope.
 
 ## License
 

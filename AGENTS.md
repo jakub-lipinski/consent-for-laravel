@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. Beta.3 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, a three-position banner, a native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2 and tracker presets remain planned.
+This repository is a Composer library, `webcrafts-studio/consent-for-laravel`, not a Laravel application. Beta.4 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, a three-position banner, a native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2, Basic/explicit Advanced gtag.js modes, and GA4/Google Ads presets are included. GTM, Meta Pixel, and Clarity remain planned.
 
 ## Conventions
 

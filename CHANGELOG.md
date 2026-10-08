@@ -1,11 +1,33 @@
 # Changelog
 
-## Unreleased
+## v1.0.0-beta.4 - Google consent and measurement presets
+
+The fourth beta adds Consent Mode v2 and ID-based GA4 / Google Ads setup.
+
+### Added
+
+- Basic and explicit Advanced gtag.js modes, ordered denied defaults/restored updates, and English/Polish Advanced disclosures.
+- GA4/Google Ads presets, automatic service registration and cookie cleanup rules, a shared loader, and nonce propagation.
+- Guarded `Consent.google.event(destination, name, parameters)` and mapped `Consent.google.state()`.
+- SPA page-view control, explicit Ads conversion labels, strict settings, and integration-aware fingerprints.
+- Local mock-tag tests for grant/refusal, restoration, routing, loading failures, expiry, storage failure, and withdrawal.
 
 ### Changed
 
-- Removed standalone browser test/demo pages from the package checkout. Native browser verification uses a disposable host application outside this repository.
-- Clarified that documentation/presentation websites belong in a separate repository; the package supplies only components and consent behavior for the consuming application.
+- Active Google preset withdrawal always reloads after applying denied signals, even with cooperative custom hooks.
+- Duplicate Google bootstraps fail closed; privacy controls disable Google signals/ad personalization features and URL passthrough.
+- Documentation/presentation and disposable browser hosts remain outside this Composer library.
+
+### Fixed
+
+- External modules now wait for imports and top-level await after their original SRI-checked load before dependent scripts continue.
+
+### Upgrade Notes
+
+- Merge new Google/preset settings, supply IDs, remove duplicate vendor installs, and update published assets/views/translations.
+- Presets remain disabled by default; beta.3 decisions stay compatible when Google is inactive.
+- Enabled target, mode, ID, initialization, purpose, or cleanup changes invalidate previous decisions.
+- GTM and other presets remain planned. See the [complete release notes](docs/releases/v1.0.0-beta.4.md) and [Google guide](docs/google.md).
 
 ## v1.0.0-beta.3 - Accessible cookie preferences
 
