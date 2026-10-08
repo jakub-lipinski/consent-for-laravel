@@ -120,7 +120,7 @@ These options declare deletion scope, not gtag cookie configuration. Additional 
 
 Active preset withdrawal always reloads, even if a custom `onRevoke` hook uses `reload: false`. Google has no complete cooperative stop lifecycle supplied by the package. GA4 is disabled immediately on Basic denial and on active Advanced withdrawal, and Google receives denied consent before cleanup/reload. In Advanced, a subsequent refused document again runs the explicitly enabled cookieless mode.
 
-Changing enabled targets, IDs, mode, page-view settings, canonical purposes, or cleanup rules changes the service fingerprint. Old decisions become pending. With the bridge disabled and presets inactive, existing fingerprints are preserved. UI-only translations/positions/colors still do not invalidate consent.
+Changing enabled targets, IDs, mode, page-view settings, canonical purposes, or cleanup rules changes the service fingerprint. Old decisions become pending. With the bridge disabled and presets inactive, existing fingerprints are preserved. UI-only variant/translation/position/color changes do not invalidate or extend consent.
 
 ## CSP and verification
 

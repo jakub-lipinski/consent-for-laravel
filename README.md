@@ -54,14 +54,15 @@ The package supplies consent components for the consuming application's layout. 
 
 ## Installation
 
-Install in your Laravel application with Composer:
+Install the stable GitHub release in your Laravel application with Composer. Register the official VCS source once; the package is not currently indexed on Packagist:
 
 ```bash
-composer require jakub-lipinski/consent-for-laravel
+composer config repositories.consent vcs https://github.com/jakub-lipinski/consent-for-laravel.git
+composer require jakub-lipinski/consent-for-laravel:^1.1
 php artisan vendor:publish --tag=consent-config
 ```
 
-No manual provider registration is required. Configure the package in `config/consent.php`, then rebuild your application's configuration cache if it is enabled:
+Composer resolves stable Git tags and records the installed version in your application's lockfile; no reduced minimum stability is needed. No manual provider registration is required. Configure the package in `config/consent.php`, then rebuild your application's configuration cache if it is enabled:
 
 ```bash
 php artisan config:cache
