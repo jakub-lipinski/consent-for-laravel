@@ -61,16 +61,14 @@
                     </div>
                     <p id="consent-description-{{ $category->value }}">{{ $ui->text('categories.'.$category->value.'.description', $language) }}</p>
                     @if($ui->services->forCategory($category) !== [])
-                    @if($appearance === 'compact')
                     <details class="consent-service-details">
-                        <summary>{{ $ui->text('services_label', $language) }}</summary>
-                    @endif
+                        <summary><span>{{ $ui->text('services_label', $language) }}</span><svg class="consent-service-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6" /></svg></summary>
                     <ul class="consent-services" aria-label="{{ $ui->text('services_label', $language) }}">
                         @foreach($ui->services->forCategory($category) as $service)
                         <li><strong>{{ $ui->serviceText($service, 'name', $language) }}</strong><span>{{ $ui->serviceText($service, 'description', $language) }}</span></li>
                         @endforeach
                     </ul>
-                    @if($appearance === 'compact')</details>@endif
+                    </details>
                     @endif
                 </div>
                 @endforeach

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.1 - Service disclosures in both variants
+
+- Standard and Compact both use initially collapsed, independently expandable service lists in every populated category. Category purposes remain visible.
+- A decorative chevron beside each disclosure label points down when closed and up when open. Native keyboard interaction and expanded-state semantics are preserved.
+- Opening or closing service details does not change category choices, save preferences, or activate optional scripts.
+- Merge the updated banner view and deploy/cache-bust the matching CSS when customizing published resources. No configuration, translation, cookie-schema, or runtime API changes are required.
+- See [release notes](docs/releases/v1.1.1.md).
+
 ## v1.1.0 - Standard and Compact interfaces
 
 ### Added

@@ -31,7 +31,10 @@ it('renders a single cache-safe interface with only registered categories and se
     $xpath = new DOMXPath($dom);
     expect($xpath->query('//input[@id="consent-category-necessary" and @checked and @disabled]')->length)->toBe(1)
         ->and($xpath->query('//input[not(@id="consent-category-necessary") and @checked]')->length)->toBe(0)
-        ->and($xpath->query('//dialog[@aria-labelledby="consent-preferences-title"]')->length)->toBe(1);
+        ->and($xpath->query('//dialog[@aria-labelledby="consent-preferences-title"]')->length)->toBe(1)
+        ->and($xpath->query('//details[@class="consent-service-details" and not(@open)]')->length)->toBe(2)
+        ->and($xpath->query('//details/summary/svg[@aria-hidden="true" and @focusable="false"]')->length)->toBe(2)
+        ->and($xpath->query('//details/ul/li/strong')->length)->toBe(2);
 })->with(['standard', 'compact']);
 
 it('preserves the standard default and supports variant overrides for the whole interface', function () {

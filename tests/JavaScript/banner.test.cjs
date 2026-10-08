@@ -276,38 +276,48 @@ test('SPA replacement mounts a different variant once and preserves the current 
     assert.equal(next.querySelector('[data-consent-category="analytics"]').checked, true);
 });
 
-test('compact preferences keep draft changes, keyboard dismissal, saving, reopening, and withdrawal', async t => {
-    const p = await page(t, { input: { ui: { variant: 'compact' }, locale: 'pl' } });
-    assert.equal(p.root.dataset.consentVariant, 'compact');
-    p.button('open').focus();
-    p.button('open').click();
-    const details = p.dialog.querySelector('.consent-service-details');
-    assert.equal(details.open, false);
-    details.querySelector('summary').click();
-    assert.equal(details.open, true);
-    assert.match(details.textContent, /Statistics|Campaigns/);
-    assert.equal(p.window.document.cookie, '');
-    p.field('analytics').click();
-    assert.equal(p.api.allowed('analytics'), false);
-    assert.equal(p.window.document.cookie, '');
-    p.dialog.dispatchEvent(new p.window.Event('cancel', { cancelable: true }));
-    assert.equal(p.doc.activeElement, p.button('open'));
-    p.button('open').click();
-    assert.equal(p.field('analytics').checked, false);
-    p.field('analytics').click();
-    p.button('save', true).click();
-    await idle(p);
-    assert.equal(p.api.allowed('analytics'), true);
-    assert.equal(p.api.allowed('marketing'), false);
-    assert.equal(p.doc.activeElement, p.launcher);
-    p.launcher.click();
-    assert.equal(p.field('analytics').checked, true);
-    p.button('reject', true).click();
-    await idle(p);
-    assert.equal(p.api.allowed('analytics'), false);
-    assert.equal(p.api.state().decidedAt !== null, true);
-    assert.equal(p.launcher.hidden, false);
-});
+for (const variant of ['standard', 'compact']) {
+    test(`${variant} service disclosures preserve draft changes, dismissal, saving, reopening, and withdrawal`, async t => {
+        const p = await page(t, { input: { ui: { variant }, locale: 'pl' } });
+        assert.equal(p.root.dataset.consentVariant, variant);
+        p.button('open').focus();
+        p.button('open').click();
+        const [details, otherDetails] = p.dialog.querySelectorAll('.consent-service-details');
+        assert.equal(details.open, false);
+        details.querySelector('summary').click();
+        assert.equal(details.open, true);
+        assert.equal(otherDetails.open, false);
+        assert.match(details.textContent, /Statistics|Campaigns/);
+        details.querySelector('summary').click();
+        assert.equal(details.open, false);
+        otherDetails.querySelector('summary').click();
+        assert.equal(otherDetails.open, true);
+        assert.equal(details.open, false);
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.api.allowed('marketing'), false);
+        assert.equal(p.window.document.cookie, '');
+        p.field('analytics').click();
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.window.document.cookie, '');
+        p.dialog.dispatchEvent(new p.window.Event('cancel', { cancelable: true }));
+        assert.equal(p.doc.activeElement, p.button('open'));
+        p.button('open').click();
+        assert.equal(p.field('analytics').checked, false);
+        p.field('analytics').click();
+        p.button('save', true).click();
+        await idle(p);
+        assert.equal(p.api.allowed('analytics'), true);
+        assert.equal(p.api.allowed('marketing'), false);
+        assert.equal(p.doc.activeElement, p.launcher);
+        p.launcher.click();
+        assert.equal(p.field('analytics').checked, true);
+        p.button('reject', true).click();
+        await idle(p);
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.api.state().decidedAt !== null, true);
+        assert.equal(p.launcher.hidden, false);
+    });
+}
 
 for (const variant of ['standard', 'compact']) {
     for (const locale of ['en', 'pl']) {

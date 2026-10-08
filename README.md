@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.1.0`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.1.1`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Google presets
 
@@ -58,7 +58,7 @@ Install the stable GitHub release in your Laravel application with Composer. Reg
 
 ```bash
 composer config repositories.consent vcs https://github.com/jakub-lipinski/consent-for-laravel.git
-composer require jakub-lipinski/consent-for-laravel:^1.1
+composer require jakub-lipinski/consent-for-laravel:^1.1.1
 php artisan vendor:publish --tag=consent-config
 ```
 
@@ -109,7 +109,7 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
 ],
 ```
 
-`standard` preserves the original spacious card and preferences dialog. `compact` uses smaller cards/dialogs, less spacing, simpler corners, outlined choice buttons, and side-by-side acceptance/refusal on wider screens. Category purposes stay visible; complete service lists are available through native, keyboard-accessible disclosures in each category. Both keep the same wording, actions, and consent behavior. Acceptance and refusal remain equally prominent. Compact changes presentation only and does not shorten purpose disclosures.
+`standard` preserves the original spacious card and preferences dialog. `compact` uses smaller cards/dialogs, less spacing, simpler corners, outlined choice buttons, and side-by-side acceptance/refusal on wider screens. In both variants, category purposes stay visible; complete service lists are initially collapsed in native, keyboard-accessible disclosures. Each has a visible arrow that changes direction when opened or closed. Both keep the same wording, actions, and consent behavior. Acceptance and refusal remain equally prominent. Compact changes presentation only and does not shorten purpose disclosures.
 
 Both variants support all three positions and validated colors. Left and right use a card; center uses a wide horizontal layout on larger screens. Actions stack on small screens, and long content scrolls vertically. The launcher follows the chosen position. Omitted `variant` settings in existing published configurations default to `standard`.
 
@@ -422,7 +422,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.0.md) for this release's scope and upgrade steps.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.1.md) for this release's scope and upgrade steps.
 
 ## License
 
