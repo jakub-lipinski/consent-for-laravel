@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "webcrafts-studio/consent-for-laravel",
+    "name": "jakub-lipinski/consent-for-laravel",
     "description": "Service-based cookie consent for Laravel with versioned preferences and browser script gating.",
     "keywords": ["laravel", "cookies", "consent", "consent-mode"],
     "type": "library",

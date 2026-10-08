@@ -57,7 +57,7 @@ The package supplies consent components for the consuming application's layout. 
 Install in your Laravel application with Composer:
 
 ```bash
-composer require webcrafts-studio/consent-for-laravel
+composer require jakub-lipinski/consent-for-laravel
 php artisan vendor:publish --tag=consent-config
 ```
 

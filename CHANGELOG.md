@@ -2,6 +2,8 @@
 
 ## v1.0.0 - Cookie consent for Laravel
 
+- Composer package: `jakub-lipinski/consent-for-laravel`.
+
 ### Added
 
 - First stable release of the PHP, Blade, browser, and configuration APIs for PHP 8.3+ and Laravel 12-13.
