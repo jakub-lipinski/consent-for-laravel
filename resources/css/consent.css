@@ -19,9 +19,9 @@
 .consent-ui h2 { font: 650 1.25rem/1.35 system-ui, sans-serif; overflow-wrap: anywhere; }
 .consent-ui p { font-size: .875rem; }
 .consent-ui button, .consent-ui input { font: inherit; }
-.consent-ui button { cursor: pointer; text-transform: none; letter-spacing: normal; }
+.consent-ui button { margin: 0; cursor: pointer; text-transform: none; letter-spacing: normal; }
 .consent-ui :focus-visible { outline: 3px solid var(--consent-focus); outline-offset: 3px; }
-.consent-ui a { color: var(--consent-accent); text-decoration: underline; text-underline-offset: .2em; overflow-wrap: anywhere; }
+.consent-ui a { margin: 0; padding: 0; color: var(--consent-accent); text-decoration: underline; text-underline-offset: .2em; overflow-wrap: anywhere; }
 .consent-ui .consent-policy { display: inline-block; padding-block: .25rem; font-size: .875rem; font-weight: 600; }
 .consent-banner {
     position: fixed;

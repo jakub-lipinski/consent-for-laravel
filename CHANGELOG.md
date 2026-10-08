@@ -8,6 +8,10 @@
 - A matching Compact banner and preferences dialog with less spacing, simpler corners, outlined choice buttons, responsive actions, and native service-list disclosures. Category purposes remain visible and complete service details stay available.
 - Coverage for defaults, overrides, invalid values, configuration caching, saved-decision compatibility, SPA remounting, and both variants/languages in semantic accessibility checks.
 
+### Fixed
+
+- Policy links and action buttons keep the interface's alignment when the host page supplies generic anchor padding or button margins.
+
 ### Upgrade Notes
 
 - Standard preserves the original interface and remains the default for existing published configurations. UI variant changes do not invalidate or extend saved choices.
