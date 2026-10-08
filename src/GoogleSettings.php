@@ -24,7 +24,7 @@ final readonly class GoogleSettings
     public function __construct(mixed $google = [], mixed $presets = [])
     {
         if (! is_array($google) || array_diff(array_keys($google), ['enabled', 'mode']) !== []
-            || ! is_array($presets) || array_diff(array_keys($presets), ['ga4', 'google_ads']) !== []) {
+            || ! is_array($presets) || array_diff(array_keys($presets), TrackerSettings::PRESET_KEYS) !== []) {
             throw new InvalidArgumentException('Invalid consent.google or consent.presets configuration.');
         }
 

@@ -31,10 +31,18 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
             $app->make(Repository::class)->get('consent.google', []),
             $app->make(Repository::class)->get('consent.presets', []),
         ));
+        $this->app->bind(TrackerSettings::class, fn (Application $app): TrackerSettings => new TrackerSettings(
+            $app->make(Repository::class)->get('consent.presets', []),
+        ));
         $this->app->bind(ServiceRegistry::class, function (Application $app): ServiceRegistry {
             $google = $app->make(GoogleSettings::class);
+            $trackers = $app->make(TrackerSettings::class);
+            $context = $google->toArray() ?? [];
+            if ($trackers->toArray() !== []) {
+                $context['trackers'] = $trackers->toArray();
+            }
 
-            return new ServiceRegistry($app->make(Repository::class)->get('consent.services', []), $google->services(), $google->toArray() ?? []);
+            return new ServiceRegistry($app->make(Repository::class)->get('consent.services', []), $google->services() + $trackers->services(), $context);
         });
         $this->app->scoped(ScriptRenderer::class);
         $this->app->bind(BannerSettings::class, fn (Application $app): BannerSettings => new BannerSettings($app->make(Repository::class)->get('consent.ui', [])));

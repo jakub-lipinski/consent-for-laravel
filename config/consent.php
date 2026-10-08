@@ -46,6 +46,17 @@ return [
             'enabled' => false,
             'conversion_id' => env('CONSENT_GOOGLE_ADS_ID'),
         ],
+        'meta_pixel' => [
+            'enabled' => false,
+            'pixel_id' => env('CONSENT_META_PIXEL_ID'),
+            'send_page_view' => true,
+        ],
+        'clarity' => [
+            'enabled' => false,
+            'project_id' => env('CONSENT_CLARITY_ID'),
+            // Also requires marketing permission. Analytics alone never grants ad storage.
+            'advertising' => false,
+        ],
     ],
 
     // Custom services describe purposes. Gate their scripts with @consent.

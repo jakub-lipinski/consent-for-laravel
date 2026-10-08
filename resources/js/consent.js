@@ -35,6 +35,26 @@
                     || target.category === 'marketing' && /^AW-[1-9][0-9]{0,19}$/.test(target.id))))) {
             throw new Error('Invalid Google runtime configuration.');
         }
+        const trackers = config.trackers ?? {};
+        if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity'].includes(key))
+            || Object.hasOwn(trackers, 'meta') && (!trackers.meta || typeof trackers.meta !== 'object' || !/^[1-9][0-9]{0,19}$/.test(trackers.meta.id)
+                || typeof trackers.meta.id !== 'string' || typeof trackers.meta.sendPageView !== 'boolean' || !config.categories.includes('marketing'))
+            || Object.hasOwn(trackers, 'clarity') && (!trackers.clarity || typeof trackers.clarity !== 'object' || !/^[a-z0-9]{1,32}$/.test(trackers.clarity.id)
+                || typeof trackers.clarity.id !== 'string' || typeof trackers.clarity.advertising !== 'boolean'
+                || !config.categories.includes('analytics') || trackers.clarity.advertising && !config.categories.includes('marketing'))) {
+            throw new Error('Invalid tracker runtime configuration.');
+        }
+        config.trackers = trackers;
+        if (trackers.meta && (window.fbq !== undefined || window._fbq !== undefined)
+            || trackers.clarity && window.clarity !== undefined
+            || [...document.scripts].some(script => {
+                if (!script.src) return false;
+                const source = new URL(script.src, document.baseURI);
+                return trackers.meta && source.hostname === 'connect.facebook.net' && source.pathname.endsWith('/fbevents.js')
+                    || trackers.clarity && ['www.clarity.ms', 'clarity.ms'].includes(source.hostname) && source.pathname.startsWith('/tag/');
+            })) {
+            throw new Error('Place Consent before Meta Pixel and Clarity and remove duplicate tracker bootstraps.');
+        }
         if (config.google != null && (window.gtag !== undefined || window.dataLayer !== undefined
             && (!Array.isArray(window.dataLayer) || window.dataLayer.length !== 0)
             || [...document.scripts].some(script => {
@@ -184,10 +204,10 @@
         let requiresReload = false;
         const tasks = [];
         for (const category of categories) {
-            const active = [...records.values(), ...googleRecords.values()].filter(record => record.category === category && record.started);
+            const active = [...records.values(), ...googleRecords.values(), ...trackerRecords.values()].filter(record => record.category === category && record.started);
             const hooks = [...(revocationHooks.get(category) ?? [])];
             const inFlight = active.some(record => record.cancels.size > 0);
-            if (inFlight || active.some(record => record.googlePreset)
+            if (inFlight || active.some(record => record.googlePreset || record.trackerPreset)
                 || (active.length > 0 && (hooks.length === 0 || hooks.some(hook => hook.reload)))) requiresReload = true;
             for (const record of active) {
                 for (const cancel of [...record.cancels]) cancel();
@@ -220,6 +240,7 @@
         const previous = current;
         current = snapshot(next);
         updateGoogle();
+        updateTrackers();
         // Previous choices were validated when installed. Expiry must still revoke code that ran earlier.
         const revoked = knownCategories.filter(key => key !== 'necessary' && previous.decidedAt !== null
             && previous.choices[key] && !permits(current, key));
@@ -399,6 +420,7 @@
     async function drain() {
         if (!ready || reloading) return;
         await drainGoogle();
+        await drainTrackers();
         scan();
         for (const record of records.values()) {
             sync();
@@ -523,9 +545,167 @@
         }),
     });
 
+    const trackerRecords = new Map();
+    const trackerLoaded = new Set();
+    const trackerFailed = new Set();
+    let metaPrevious = null;
+    let clarityPrevious = null;
+
+    function claritySignals() {
+        const analytics = permits(current, 'analytics');
+        return { analytics_Storage: analytics ? 'granted' : 'denied',
+            ad_Storage: analytics && config.trackers.clarity?.advertising && permits(current, 'marketing') ? 'granted' : 'denied' };
+    }
+
+    function trackerCommand(preset, ...args) {
+        const command = window[preset === 'meta' ? 'fbq' : 'clarity'];
+        if (typeof command !== 'function') throw new Error(`The ${preset} browser API is unavailable.`);
+        command(...args);
+    }
+
+    function updateTrackers() {
+        for (const preset of ['meta', 'clarity']) {
+            if (!config.trackers[preset]) continue;
+            const signals = preset === 'meta' ? permits(current, 'marketing') ? 'grant' : 'revoke' : claritySignals();
+            const previous = preset === 'meta' ? metaPrevious : clarityPrevious;
+            if (JSON.stringify(signals) === JSON.stringify(previous)) continue;
+            try {
+                trackerCommand(preset, preset === 'meta' ? 'consent' : 'consentv2', signals);
+                if (preset === 'meta') metaPrevious = signals;
+                else {
+                    clarityPrevious = signals;
+                    if (trackerRecords.get('clarity')?.started && signals.ad_Storage === 'granted') {
+                        trackerRecords.set('clarity-ads', { id: 'clarity-ads', category: 'marketing',
+                            started: true, nodes: [], cancels: new Set(), trackerPreset: true });
+                    }
+                }
+            } catch (error) {
+                trackerFailed.add(preset);
+                report(preset, error);
+                if (trackerRecords.get(preset)?.started && (preset === 'meta' ? signals === 'revoke'
+                    : signals.analytics_Storage === 'denied' || signals.ad_Storage === 'denied' && previous?.ad_Storage === 'granted')) {
+                    reload('tracker-consent');
+                }
+            }
+        }
+    }
+
+    if (config.trackers.meta) {
+        const fbq = function () { fbq.callMethod ? fbq.callMethod.apply(fbq, arguments) : fbq.queue.push(arguments); };
+        Object.assign(fbq, { push: fbq, loaded: true, version: '2.0', queue: [] });
+        window.fbq = window._fbq = fbq;
+        trackerCommand('meta', 'consent', 'revoke');
+        metaPrevious = 'revoke';
+    }
+    if (config.trackers.clarity) {
+        const clarity = function () { clarity.q.push(arguments); };
+        clarity.q = [];
+        window.clarity = clarity;
+    }
+    updateTrackers();
+
+    async function drainTrackers() {
+        for (const preset of ['meta', 'clarity']) {
+            const settings = config.trackers[preset];
+            const category = preset === 'meta' ? 'marketing' : 'analytics';
+            sync();
+            if (!settings || trackerLoaded.has(preset) || trackerFailed.has(preset) || !canRun(category)) continue;
+            const record = { id: preset, category, started: false, nodes: [], cancels: new Set(), trackerPreset: true };
+            trackerRecords.set(preset, record);
+            try {
+                const script = document.createElement('script');
+                script.src = preset === 'meta' ? 'https://connect.facebook.net/en_US/fbevents.js'
+                    : `https://www.clarity.ms/tag/${encodeURIComponent(settings.id)}`;
+                if (preset === 'clarity' && claritySignals().ad_Storage === 'granted') {
+                    trackerRecords.set('clarity-ads', { id: 'clarity-ads', category: 'marketing',
+                        started: true, nodes: [], cancels: new Set(), trackerPreset: true });
+                }
+                if (!await execute(script, record)) continue;
+                sync();
+                if (!canRun(category)) continue;
+                if (preset === 'meta') {
+                    trackerCommand('meta', 'init', settings.id);
+                    sync();
+                    if (settings.sendPageView && canRun(category)) trackerCommand('meta', 'track', 'PageView');
+                }
+                trackerLoaded.add(preset);
+                // The Clarity library replaces its queue stub. Always address the current API.
+                if (preset === 'clarity') {
+                    clarityPrevious = null;
+                    updateTrackers();
+                }
+            } catch (error) {
+                trackerFailed.add(preset);
+                if (error.name !== 'AbortError') report(preset, error);
+            }
+        }
+    }
+
+    async function trackerEvent(preset, args) {
+        const category = preset === 'meta' ? 'marketing' : 'analytics';
+        if (!config.trackers[preset]) throw new TypeError(`The ${preset} preset is not enabled.`);
+        sync();
+        if (!canRun(category)) return false;
+        await initialized;
+        schedule();
+        await loadQueue;
+        sync();
+        if (!canRun(category) || !trackerLoaded.has(preset) || trackerFailed.has(preset)) return false;
+        trackerCommand(preset, ...args);
+        return true;
+    }
+
+    function eventName(name) {
+        if (typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(name)) {
+            throw new TypeError('Tracker event names must start with a letter and contain at most 128 letters, digits, underscores, dots, or hyphens.');
+        }
+        return name;
+    }
+
+    function metaEvent(method, name, parameters, options) {
+        try {
+            eventName(name);
+            if (!parameters || Object.prototype.toString.call(parameters) !== '[object Object]'
+                || !options || Object.prototype.toString.call(options) !== '[object Object]'
+                || Object.keys(options).some(key => key !== 'eventID')
+                || Object.hasOwn(options, 'eventID') && (typeof options.eventID !== 'string' || !options.eventID.trim() || options.eventID.length > 128)) {
+                throw new TypeError('Meta events require a parameter object and an optional eventID string of 1-128 characters.');
+            }
+            const data = JSON.parse(JSON.stringify(parameters));
+            const eventOptions = { ...options };
+            sync();
+            const permitted = canRun('marketing');
+            return operation(() => {
+                if (!config.trackers.meta) throw new TypeError('The meta preset is not enabled.');
+                return permitted ? trackerEvent('meta', [method, name, data, eventOptions]) : false;
+            });
+        } catch (error) { return Promise.reject(error); }
+    }
+
+    const metaApi = Object.freeze({
+        track: (name, parameters = {}, options = {}) => metaEvent('track', name, parameters, options),
+        trackCustom: (name, parameters = {}, options = {}) => metaEvent('trackCustom', name, parameters, options),
+    });
+    const clarityApi = Object.freeze({
+        state: () => { sync(); return Object.freeze(claritySignals()); },
+        event: name => {
+            try {
+                eventName(name);
+                sync();
+                const permitted = canRun('analytics');
+                return operation(() => {
+                    if (!config.trackers.clarity) throw new TypeError('The clarity preset is not enabled.');
+                    return permitted ? trackerEvent('clarity', ['event', name]) : false;
+                });
+            } catch (error) { return Promise.reject(error); }
+        },
+    });
+
     const api = {
         __consentForLaravel: true,
         google: googleApi,
+        meta: metaApi,
+        clarity: clarityApi,
         state: () => snapshot(sync()),
         allowed: category => { checkCategory(category); sync(); return category === 'necessary' || canRun(category); },
         choose,

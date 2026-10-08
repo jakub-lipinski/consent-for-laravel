@@ -66,6 +66,7 @@ async function page(t, options = {}) {
     const virtualConsole = new VirtualConsole();
     virtualConsole.on('jsdomError', error => consoleErrors.push(error));
     const dom = new JSDOM(`<!doctype html><html><head>
+        ${options.head ?? ''}
         <script type="application/json" data-consent-config>${JSON.stringify(config)}</script>
         <script nonce="fixture-nonce" data-consent-runtime>${runtime}</script>
         </head><body>${options.html ?? ''}</body></html>`, {
@@ -732,4 +733,264 @@ test('expired Google consent becomes denied before refresh cleanup', async t => 
     assert.equal(commands(p).at(-1)[1], 'update');
     assert.equal(commands(p).at(-1)[2].analytics_storage, 'denied');
     assert.ok(p.reloads.some(event => event.reason === 'revocation'));
+});
+
+const trackerConfig = (advertising = false, sendPageView = true) => ({
+    meta: { id: '123456789012345', sendPageView },
+    clarity: { id: 'abc123def4', advertising },
+});
+const metaFixture = `
+window.metaCommands = Array.from(fbq.queue, args => Array.from(args));
+fbq.queue.length = 0;
+fbq.callMethod = function () { metaCommands.push(Array.from(arguments)); };
+`;
+const clarityFixture = `
+window.clarityCommands = Array.from(clarity.q, args => Array.from(args));
+window.clarity = function () { clarityCommands.push(Array.from(arguments)); };
+`;
+const trackerFiles = { '/en_US/fbevents.js': metaFixture, '/tag/abc123def4': clarityFixture };
+const trackerServices = [
+    { id: 'meta-pixel', category: 'marketing', cookies: [ { name: '_fbp', prefix: null, path: '/', domain: null }, { name: '_fbc', prefix: null, path: '/', domain: null } ] },
+    { id: 'microsoft-clarity', category: 'analytics', cookies: [ { name: '_clck', prefix: null, path: '/', domain: null }, { name: '_clsk', prefix: null, path: '/', domain: null } ] },
+];
+
+test('tracker presets make no requests or event replay while pending or refused', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(plain(p.window.fbq.queue.map(args => Array.from(args))), [['consent', 'revoke']]);
+    assert.deepEqual(plain(p.api.clarity.state()), { analytics_Storage: 'denied', ad_Storage: 'denied' });
+    assert.equal(await p.api.meta.track('Purchase', { value: 9 }), false);
+    assert.equal(await p.api.clarity.event('checkout'), false);
+    await p.api.rejectOptional();
+    assert.deepEqual(p.loader.requests, []);
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.metaCommands.filter(args => args[0] === 'track')), [['track', 'PageView']]);
+    assert.equal(p.window.clarityCommands.some(args => args[0] === 'event'), false);
+});
+
+test('Clarity analytics never grants advertising implicitly and addresses the replacement API', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    await p.api.choose({ analytics: true });
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/tag/abc123def4']);
+    assert.deepEqual(plain(p.window.clarityCommands.at(-1)), ['consentv2', { analytics_Storage: 'granted', ad_Storage: 'denied' }]);
+    assert.equal(await p.api.clarity.event('checkout-completed'), true);
+    assert.deepEqual(plain(p.window.clarityCommands.at(-1)), ['event', 'checkout-completed']);
+    assert.equal(await p.api.meta.track('Lead'), false);
+});
+
+test('Meta needs marketing, initializes once, inherits CSP nonce, and sends typed events', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    await p.api.choose({ marketing: true });
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/en_US/fbevents.js']);
+    assert.deepEqual(plain(p.window.metaCommands), [['consent', 'revoke'], ['consent', 'grant'], ['init', '123456789012345'], ['track', 'PageView']]);
+    assert.equal(p.window.document.querySelector('script[src]').nonce, 'fixture-nonce');
+    assert.equal(p.window.document.querySelector('noscript'), null);
+    assert.equal(await p.api.meta.track('Purchase', { value: 19, currency: 'PLN' }, { eventID: 'order-42' }), true);
+    assert.deepEqual(plain(p.window.metaCommands.at(-1)), ['track', 'Purchase', { value: 19, currency: 'PLN' }, { eventID: 'order-42' }]);
+    assert.equal(await p.api.meta.trackCustom('NewsletterSignup'), true);
+    await p.api.choose({ marketing: true });
+    await p.api.whenIdle();
+    assert.equal(p.window.metaCommands.filter(args => args[0] === 'init').length, 1);
+    assert.equal(p.window.metaCommands.filter(args => args[1] === 'PageView').length, 1);
+});
+
+test('Meta SPA configuration omits automatic PageView and captures event data at invocation', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig(false, false) }, files: trackerFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    const params = { value: 10 }; const options = { eventID: 'original' };
+    const result = p.api.meta.track('Purchase', params, options);
+    params.value = 999; options.eventID = 'changed';
+    assert.equal(await result, true);
+    assert.deepEqual(plain(p.window.metaCommands.at(-1)), ['track', 'Purchase', { value: 10 }, { eventID: 'original' }]);
+    assert.equal(p.window.metaCommands.some(args => args[1] === 'PageView'), false);
+});
+
+test('denied tracker calls cannot become replayed events behind an already queued acceptance', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    const grant = p.api.acceptAll();
+    const meta = p.api.meta.track('Lead'); const clarity = p.api.clarity.event('lead');
+    await grant;
+    assert.equal(await meta, false); assert.equal(await clarity, false);
+    await p.api.whenIdle();
+    assert.equal(p.window.metaCommands.some(args => args[1] === 'Lead'), false);
+    assert.equal(p.window.clarityCommands.some(args => args[0] === 'event'), false);
+});
+
+test('restored decisions apply tracker consent before each SDK loads', async t => {
+    const config = configuration({ trackers: trackerConfig(true) });
+    const p = await page(t, { config, state: decision(config, { analytics: true, marketing: true }), files: trackerFiles });
+    assert.deepEqual(p.loader.requests, ['/en_US/fbevents.js', '/tag/abc123def4']);
+    assert.deepEqual(plain(p.window.clarityCommands[0]), ['consentv2', { analytics_Storage: 'granted', ad_Storage: 'granted' }]);
+    assert.deepEqual(plain(p.window.metaCommands.slice(0, 2)), [['consent', 'revoke'], ['consent', 'grant']]);
+});
+
+test('marketing alone never loads Clarity, even with advertising enabled', async t => {
+    const p = await page(t, { config: { trackers: { clarity: trackerConfig(true).clarity } }, files: trackerFiles });
+    await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(plain(p.api.clarity.state()), { analytics_Storage: 'denied', ad_Storage: 'denied' });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(plain(p.api.clarity.state()), { analytics_Storage: 'granted', ad_Storage: 'granted' });
+});
+
+for (const category of ['marketing', 'analytics']) {
+    test(`active ${category} tracker withdrawal sends denial before listeners, cleans cookies, and forces reload`, async t => {
+        const p = await page(t, { config: { trackers: trackerConfig(), services: trackerServices }, files: trackerFiles });
+        await p.api.acceptAll(); await p.api.whenIdle();
+        for (const name of ['_fbp', '_fbc', '_clck', '_clsk', 'app_session']) p.window.document.cookie = `${name}=fixture; Path=/`;
+        p.api.onRevoke(category, () => {}, { reload: false });
+        let observed;
+        p.api.onChange(() => { observed = category === 'marketing' ? plain(p.window.metaCommands.at(-1)) : plain(p.window.clarityCommands.at(-1)); });
+        await p.api.choose({ analytics: category !== 'analytics', marketing: category !== 'marketing' });
+        assert.deepEqual(observed, category === 'marketing' ? ['consent', 'revoke'] : ['consentv2', { analytics_Storage: 'denied', ad_Storage: 'denied' }]);
+        assert.equal(p.reloads.length, 1);
+        assert.equal(await p.api.meta.track('Lead'), false);
+        assert.equal(await p.api.clarity.event('lead'), false);
+        assert.ok(p.window.document.cookie.includes('app_session=fixture'));
+        const removed = category === 'marketing' ? ['_fbp', '_fbc'] : ['_clck', '_clsk'];
+        assert.ok(removed.every(name => !p.window.document.cookie.includes(`${name}=`)));
+    });
+}
+
+test('Clarity advertising withdrawal requires reload while analytics stays accepted', async t => {
+    const p = await page(t, { config: { trackers: { clarity: trackerConfig(true).clarity } }, files: trackerFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    await p.api.choose({ analytics: true });
+    assert.deepEqual(plain(p.window.clarityCommands.at(-1)), ['consentv2', { analytics_Storage: 'granted', ad_Storage: 'denied' }]);
+    assert.equal(p.reloads.length, 1);
+});
+
+test('marketing withdrawn during a Clarity advertising request still reloads', async t => {
+    const p = await page(t, { config: { trackers: { clarity: trackerConfig(true).clarity }, scriptTimeoutMs: 300 }, files: { '/tag/abc123def4': 'hang' } });
+    await p.api.acceptAll();
+    await delay(10);
+    await p.api.choose({ analytics: true });
+    assert.equal(p.reloads.length, 1);
+    assert.deepEqual(plain(p.api.clarity.state()), { analytics_Storage: 'granted', ad_Storage: 'denied' });
+});
+
+test('expiry and external cookie refusal revoke tracker consent and reload', async t => {
+    for (const source of ['expiry', 'external']) {
+        const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+        await p.api.acceptAll(); await p.api.whenIdle();
+        if (source === 'expiry') {
+            const original = p.window.Date.now; p.window.Date.now = () => original() + 181 * 86400000;
+        } else store(p.jar, decision(p.config, {}));
+        await p.api.refresh();
+        assert.deepEqual(plain(p.window.metaCommands.at(-1)), ['consent', 'revoke']);
+        assert.deepEqual(plain(p.window.clarityCommands.at(-1)), ['consentv2', { analytics_Storage: 'denied', ad_Storage: 'denied' }]);
+        assert.equal(p.reloads.length, 1);
+    }
+});
+
+test('failed tracker loads are isolated and never initialize or retry', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: { ...trackerFiles, '/en_US/fbevents.js': new Error('offline') }, html: block('custom', 'analytics', inline('order.push("custom")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.equal(await p.api.meta.track('Lead'), false);
+    assert.equal(await p.api.clarity.event('checkout'), true);
+    assert.deepEqual(plain(p.window.order), ['custom']);
+    assert.equal(p.errors.filter(error => error.code === 'meta').length, 1);
+    assert.equal(p.loader.requests.filter(path => path === '/en_US/fbevents.js').length, 1);
+    assert.equal(p.window.fbq.queue.some(args => args[0] === 'init'), false);
+});
+
+test('tracker command failure cannot prevent stored denial and reload', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    p.window.fbq.callMethod = () => { throw new Error('SDK error'); };
+    await p.api.rejectOptional();
+    assert.equal(p.api.state().choices.marketing, false);
+    assert.equal(p.api.state().choices.analytics, false);
+    assert.equal(p.reloads.length, 1);
+    assert.ok(p.errors.some(error => error.code === 'meta'));
+});
+
+for (const preset of ['meta', 'clarity']) {
+    test(`duplicate ${preset} bootstrap is rejected before any optional runtime activation`, async t => {
+        const p = await page(t, { config: { trackers: trackerConfig() }, before: window => { window[preset === 'meta' ? 'fbq' : 'clarity'] = () => {}; } });
+        assert.equal(p.api, undefined);
+        assert.equal(p.errors[0].code, 'configuration');
+        assert.deepEqual(p.loader.requests, []);
+    });
+}
+
+test('duplicate script elements and malformed tracker settings fail closed', async t => {
+    for (const trackers of [{ meta: null }, { meta: { id: 123, sendPageView: true } }, { clarity: { id: '../unsafe', advertising: false } }, { gtm: {} }]) {
+        const p = await page(t, { config: { trackers } });
+        assert.equal(p.api, undefined);
+        assert.equal(p.errors[0].code, 'configuration');
+    }
+    for (const source of ['https://connect.facebook.net/en_US/fbevents.js', 'https://www.clarity.ms/tag/abc123def4']) {
+        const p = await page(t, { config: { trackers: trackerConfig() }, head: `<script type="application/json" src="${source}"></script>` });
+        assert.equal(p.api, undefined);
+        assert.equal(p.errors[0].code, 'configuration');
+        assert.deepEqual(p.loader.requests, []);
+    }
+});
+
+test('invalid tracker events reject clearly without sending commands', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles });
+    for (const args of [[''], ['Purchase', []], ['Purchase', {}, { eventID: '' }], ['Purchase', {}, { other: true }]]) {
+        await assert.rejects(p.api.meta.track(...args), error => error.name === 'TypeError');
+    }
+    await assert.rejects(p.api.clarity.event('a'.repeat(129)), error => error.name === 'TypeError');
+    const disabled = await page(t);
+    await assert.rejects(disabled.api.meta.track('Lead'), /not enabled/);
+    await assert.rejects(disabled.api.clarity.event('lead'), /not enabled/);
+    assert.deepEqual(p.loader.requests, []);
+});
+
+test('Google Advanced never relaxes the strict gates of Meta or Clarity', async t => {
+    const p = await page(t, { config: { google: googleConfig('advanced'), trackers: trackerConfig() }, files: { ...googleFiles, ...trackerFiles } });
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    await p.api.rejectOptional(); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    assert.equal(await p.api.meta.track('Lead'), false);
+    assert.equal(await p.api.clarity.event('lead'), false);
+});
+
+test('Meta withdrawal during loading cancels initialization and automatic PageView', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: { ...trackerFiles, '/en_US/fbevents.js': { body: metaFixture, delay: 80 } } });
+    await p.api.choose({ marketing: true });
+    await delay(10);
+    await p.api.rejectOptional(); await p.api.whenIdle();
+    assert.equal(p.reloads.length, 1);
+    assert.equal(p.window.metaCommands, undefined);
+    assert.equal(p.window.fbq.queue.some(args => args[0] === 'init'), false);
+    assert.deepEqual(plain(Array.from(p.window.fbq.queue.at(-1))), ['consent', 'revoke']);
+});
+
+test('Clarity timeout requires a fresh document and prevents further event dispatch', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig(), scriptTimeoutMs: 25 }, files: { ...trackerFiles, '/tag/abc123def4': 'hang' }, html: block('other-stats', 'analytics', inline('order.push("independent")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    assert.equal(await p.api.clarity.event('checkout'), false);
+    assert.equal(await p.api.meta.track('Lead'), false);
+    assert.deepEqual(p.reloads, [{ reason: 'script-timeout' }]);
+    assert.ok(p.errors.some(error => error.code === 'clarity'));
+});
+
+test('failed preference storage starts neither tracker and never sends granted signals', async t => {
+    const p = await page(t, { config: { trackers: trackerConfig() }, files: trackerFiles, before: window => {
+        Object.defineProperty(window.document, 'cookie', { get: () => '', set: () => {} });
+    } });
+    await assert.rejects(p.api.acceptAll(), /stored/);
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(plain(p.window.fbq.queue.map(args => Array.from(args))), [['consent', 'revoke']]);
+    assert.deepEqual(plain(p.api.clarity.state()), { analytics_Storage: 'denied', ad_Storage: 'denied' });
+});
+
+test('Meta rechecks external cookie changes after init before automatic PageView', async t => {
+    const config = configuration({ trackers: trackerConfig() });
+    const refused = encodeURIComponent(JSON.stringify(decision(config, {})));
+    const fixture = metaFixture + `const originalMeta=fbq.callMethod;fbq.callMethod=function(){originalMeta(...arguments);if(arguments[0]==='init')document.cookie='consent_preferences=${refused}; Path=/';};`;
+    const p = await page(t, { config, files: { ...trackerFiles, '/en_US/fbevents.js': fixture } });
+    await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.equal(p.window.metaCommands.some(args => args[1] === 'PageView'), false);
+    assert.equal(p.api.state().choices.marketing, false);
+    assert.equal(p.reloads.length, 1);
 });

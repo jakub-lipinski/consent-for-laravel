@@ -5,6 +5,9 @@ return [
     'presets' => [
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Pomiar wizyt i korzystania ze strony.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Pomiar konwersji reklamowych i zarządzanie sygnałami zgody reklamowej.'],
+        'meta-pixel' => ['name' => 'Meta Pixel', 'description' => 'Pomiar skuteczności reklam i interakcji ze stroną.'],
+        'microsoft-clarity' => ['name' => 'Microsoft Clarity', 'description' => 'Analiza korzystania ze strony za pomocą nagrań sesji i map cieplnych.'],
+        'microsoft-clarity-ads' => ['name' => 'Funkcje reklamowe Microsoft Clarity', 'description' => 'Przechowywanie danych związanych z reklamami w Microsoft Clarity.'],
     ],
     'banner_title' => 'Twoja prywatność jest ważna',
     'banner_description' => 'Używamy niezbędnych cookies do działania strony. Za Twoją zgodą korzystamy też z opcjonalnych cookies w celach opisanych w preferencjach. W każdej chwili możesz zmienić swój wybór.',

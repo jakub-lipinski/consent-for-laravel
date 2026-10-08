@@ -32,6 +32,7 @@ final readonly class BrowserRuntime
             'scriptTimeoutMs' => $this->settings->scriptTimeoutMs,
             'cleanupTimeoutMs' => $this->settings->cleanupTimeoutMs,
             'google' => (new GoogleSettings($this->configuration->get('consent.google', []), $this->configuration->get('consent.presets', [])))->toArray(),
+            'trackers' => (new TrackerSettings($this->configuration->get('consent.presets', [])))->toArray(),
         ];
     }
 

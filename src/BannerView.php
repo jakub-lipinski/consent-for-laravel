@@ -37,8 +37,9 @@ final readonly class BannerView
         $key = 'consent::services.'.$service->id.'.'.$field;
         $translated = $this->translator->get($key, [], $locale, false);
 
-        if ($translated === $key && isset(GoogleSettings::SERVICE_DEFAULTS[$service->id][$field])
-            && $service->{$field} === GoogleSettings::SERVICE_DEFAULTS[$service->id][$field]) {
+        $defaults = GoogleSettings::SERVICE_DEFAULTS + TrackerSettings::SERVICE_DEFAULTS;
+        if ($translated === $key && isset($defaults[$service->id][$field])
+            && $service->{$field} === $defaults[$service->id][$field]) {
             return $this->text('presets.'.$service->id.'.'.$field, $locale);
         }
 
