@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.3 - Non-blocking theme diagnostics
+
+- Color contrast no longer interrupts host-page rendering. `ui.validate_contrast` defaults to `false`; when enabled, it logs warnings and preserves the chosen colors.
+- Invalid color formats fall back to their defaults, unknown keys are ignored, and malformed color arrays use the default palette. Unsafe values never enter CSS. Diagnostic logging failures do not break the page.
+- Existing published configuration works without adding the new key. Theme diagnostics do not change consent decisions, lifetimes, service fingerprints, or tracker gates.
+- See [release notes](docs/releases/v1.1.3.md).
+
 ## v1.1.2 - Reliable focus and consent withdrawal
 
 - Clicking or focusing a large page container no longer hides the pending banner and its launcher. Overlays still yield to fully covered host-page controls.

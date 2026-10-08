@@ -126,7 +126,7 @@ it('keeps both translation dictionaries complete and all default theme contrast 
     expect(BannerSettings::contrast('#000000', '#ffffff'))->toBe(21.0);
 });
 
-it('validates UI configuration and rejects unsafe or inaccessible themes', function (mixed $ui) {
+it('validates UI configuration and rejects unsafe policy URLs', function (mixed $ui) {
     expect(fn () => new BannerSettings($ui))->toThrow(InvalidArgumentException::class);
 })->with([
     [null], [false], [['unexpected' => true]], [['position' => 'center']], [['position' => null]],
@@ -134,9 +134,6 @@ it('validates UI configuration and rejects unsafe or inaccessible themes', funct
     [['variant' => true]], [['variant' => 1]], [['variant' => []]],
     [['locale' => 'de']], [['locale' => []]], [['policy_url' => 'javascript:alert(1)']], [['policy_url' => '//example.test']],
     [['policy_url' => 'https://user:password@example.test']], [['policy_url' => '/\\example.test']], [['policy_url' => ' /cookies']],
-    [['colors' => null]], [['colors' => ['unknown' => '#000000']]], [['colors' => ['accent' => 'red']]],
-    [['colors' => ['accent' => '#000;}</style>']]], [['colors' => ['text' => '#ffffff']]], [['colors' => ['muted' => '#aaaaaa']]],
-    [['colors' => ['accent_text' => '#245c49']]], [['colors' => ['control' => '#eeeeee']]], [['colors' => ['focus' => '#eeeeee']]],
 ]);
 
 it('supports custom accessible colors and validates component overrides', function () {

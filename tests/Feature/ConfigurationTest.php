@@ -105,6 +105,8 @@ it('caches custom service and cookie configuration without closures or objects',
     $configuration['policy_version'] = 'policy-2';
     $configuration['cookie']['name'] = 'cached_consent';
     $configuration['ui']['variant'] = 'compact';
+    $configuration['ui']['validate_contrast'] = true;
+    $configuration['ui']['colors'] = ['accent' => '#d86a32'];
     $configuration['services'] = ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']];
     $configPath = config_path('consent.php');
     $cachePath = $this->app->getCachedConfigPath();
@@ -117,6 +119,8 @@ it('caches custom service and cookie configuration without closures or objects',
         expect($cached)->toBe($configuration)
             ->and((new ConsentSettings($cached))->cookieName)->toBe('cached_consent')
             ->and((new BannerSettings($cached['ui']))->variant)->toBe('compact')
+            ->and((new BannerSettings($cached['ui']))->validateContrast)->toBeTrue()
+            ->and((new BannerSettings($cached['ui']))->colors['accent'])->toBe('#d86a32')
             ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics');
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);

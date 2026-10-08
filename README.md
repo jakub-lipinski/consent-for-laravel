@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating. Install the stable package from [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel); [GitHub](https://github.com/jakub-lipinski/consent-for-laravel) hosts its source and releases.
 
-**Current release: `v1.1.2`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.1.3`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Requirements
 
@@ -146,6 +146,7 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
     'position' => 'bottom-left', // bottom-left, bottom-right, bottom-center
     'locale' => null,           // Follow the app locale; or explicitly en / pl
     'policy_url' => '/cookies',
+    'validate_contrast' => false, // true logs contrast warnings without interrupting the page
     'colors' => [
         'accent' => '#245c49',
         'focus' => '#245c49',
@@ -176,7 +177,7 @@ The application locale selects Polish for `pl`, including `pl_PL` / `pl-PL`, and
 | `control` | `#67776e` | Outlined controls and unchecked switches |
 | `focus` | `#245c49` | Keyboard focus outline |
 
-The renderer rejects invalid colors and combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. Custom CSS and published view changes require their own accessibility checks. Changing variant, position, colors, or UI language does not invalidate or extend a decision.
+Contrast diagnostics are opt-in: `ui.validate_contrast` defaults to `false`, including when the key is absent from existing published configuration. Set it to `true` to log warnings for combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. These warnings preserve the selected colors and never interrupt rendering, even if the logger fails. Invalid color formats fall back to the corresponding default; unknown color keys are ignored and a malformed colors array uses the default palette. These format problems log a warning regardless of the contrast flag, and unsafe values never enter CSS. The default palette meets these contrast thresholds; custom themes, CSS, and published view changes require their own accessibility checks. Changing colors or diagnostics does not invalidate or extend a saved consent decision.
 
 ### Translations and custom openers
 
@@ -494,7 +495,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.2.md) for this release's scope and upgrade steps.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.1.3.md) for this release's scope and upgrade steps.
 
 ## License
 

@@ -28,7 +28,9 @@ return [
         // null uses the application's locale, with English as the fallback.
         'locale' => null,
         'policy_url' => null,
-        // Optional six-digit hex colors. Contrast is validated before rendering.
+        // Optional contrast diagnostics in the application log; never interrupt rendering.
+        'validate_contrast' => false,
+        // Six-digit hex colors. Invalid values fall back to their defaults and log a warning.
         'colors' => [],
     ],
 

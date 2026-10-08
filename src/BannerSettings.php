@@ -28,13 +28,18 @@ final readonly class BannerSettings
     /** @var array<string, string> */
     public array $colors;
 
+    public bool $validateContrast;
+
+    /** @var list<string> */
+    public array $colorWarnings;
+
     public function __construct(mixed $configuration)
     {
-        if (! is_array($configuration) || array_diff(array_keys($configuration), ['variant', 'position', 'locale', 'policy_url', 'colors']) !== []) {
-            throw new InvalidArgumentException('consent.ui must contain only variant, position, locale, policy_url, and colors.');
+        if (! is_array($configuration) || array_diff(array_keys($configuration), ['variant', 'position', 'locale', 'policy_url', 'colors', 'validate_contrast']) !== []) {
+            throw new InvalidArgumentException('consent.ui must contain only variant, position, locale, policy_url, colors, and validate_contrast.');
         }
 
-        $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => []];
+        $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => [], 'validate_contrast' => false];
         $this->variant = self::variant($configuration['variant']);
         $this->position = self::position($configuration['position']);
         if ($configuration['locale'] !== null && ! in_array($configuration['locale'], ['en', 'pl'], true)) {
@@ -42,25 +47,44 @@ final readonly class BannerSettings
         }
         $this->locale = $configuration['locale'];
         $this->policyUrl = self::policyUrl($configuration['policy_url']);
+        $warnings = [];
+        $this->validateContrast = $configuration['validate_contrast'] === true;
+        if (! is_bool($configuration['validate_contrast'])) {
+            $warnings[] = 'consent.ui.validate_contrast must be boolean; contrast diagnostics are disabled.';
+        }
         $colors = $configuration['colors'];
-        if (! is_array($colors) || array_diff(array_keys($colors), array_keys(self::COLORS)) !== []) {
-            throw new InvalidArgumentException('consent.ui.colors contains an unknown color.');
+        if (! is_array($colors)) {
+            $warnings[] = 'consent.ui.colors must be an array; using the default colors.';
+            $colors = [];
         }
-        foreach ($colors as $key => $color) {
+        if (array_diff(array_keys($colors), array_keys(self::COLORS)) !== []) {
+            $warnings[] = 'consent.ui.colors contains unknown color keys; ignoring them.';
+        }
+        $resolved = self::COLORS;
+        foreach (self::COLORS as $key => $default) {
+            if (! array_key_exists($key, $colors)) {
+                continue;
+            }
+            $color = $colors[$key];
             if (! is_string($color) || ! preg_match('/\A#[a-fA-F0-9]{6}\z/', $color)) {
-                throw new InvalidArgumentException("Consent color [{$key}] must be a six-digit hex color.");
+                $warnings[] = "Consent color [{$key}] must be a six-digit hex color; using its default.";
+
+                continue;
             }
-            $colors[$key] = strtolower($color);
+            $resolved[$key] = strtolower($color);
         }
-        $this->colors = $colors + self::COLORS;
-        foreach (['text' => 4.5, 'muted' => 4.5, 'accent' => 4.5, 'control' => 3.0, 'focus' => 3.0] as $key => $minimum) {
-            if (self::contrast($this->colors[$key], $this->colors['background']) < $minimum) {
-                throw new InvalidArgumentException("Consent color [{$key}] has insufficient contrast against background (minimum {$minimum}:1).");
+        $this->colors = $resolved;
+        if ($this->validateContrast) {
+            foreach (['text' => 4.5, 'muted' => 4.5, 'accent' => 4.5, 'control' => 3.0, 'focus' => 3.0] as $key => $minimum) {
+                if (self::contrast($this->colors[$key], $this->colors['background']) < $minimum) {
+                    $warnings[] = "Consent color [{$key}] has insufficient contrast against background (minimum {$minimum}:1).";
+                }
+            }
+            if (self::contrast($this->colors['accent_text'], $this->colors['accent']) < 4.5) {
+                $warnings[] = 'Consent accent_text requires at least 4.5:1 contrast against accent.';
             }
         }
-        if (self::contrast($this->colors['accent_text'], $this->colors['accent']) < 4.5) {
-            throw new InvalidArgumentException('Consent accent_text requires at least 4.5:1 contrast against accent.');
-        }
+        $this->colorWarnings = $warnings;
     }
 
     public static function variant(mixed $variant): string

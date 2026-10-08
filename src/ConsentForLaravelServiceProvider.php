@@ -6,8 +6,10 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\View\Compilers\BladeCompiler;
+use Psr\Log\LoggerInterface;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Throwable;
 
 class ConsentForLaravelServiceProvider extends PackageServiceProvider
 {
@@ -45,7 +47,18 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
             return new ServiceRegistry($app->make(Repository::class)->get('consent.services', []), $google->services() + $trackers->services(), $context);
         });
         $this->app->scoped(ScriptRenderer::class);
-        $this->app->bind(BannerSettings::class, fn (Application $app): BannerSettings => new BannerSettings($app->make(Repository::class)->get('consent.ui', [])));
+        $this->app->bind(BannerSettings::class, function (Application $app): BannerSettings {
+            $settings = new BannerSettings($app->make(Repository::class)->get('consent.ui', []));
+            if ($settings->colorWarnings !== []) {
+                try {
+                    $app->make(LoggerInterface::class)->warning('Consent UI theme requires attention.', ['issues' => $settings->colorWarnings]);
+                } catch (Throwable) {
+                    // Optional theme diagnostics must not interrupt the host page if logging fails.
+                }
+            }
+
+            return $settings;
+        });
     }
 
     public function packageBooted(): void
