@@ -1,6 +1,6 @@
 # Browser runtime
 
-Since `v1.0.0-beta.2`, the package provides script gating and a public browser API. Beta.3 adds the [built-in cookie interface](interface.md). Include `<x-consent::head />` early in the layout, register processing purposes in `consent.services`, and wrap optional script tags in `@consent('category', 'stable-id') ... @endconsent`.
+The package provides script gating, a public browser API, and the [built-in cookie interface](interface.md). Include `<x-consent::head />` early in the layout, register processing purposes in `consent.services`, and wrap optional script tags in `@consent('category', 'stable-id') ... @endconsent`.
 
 ## Execution lifecycle
 
@@ -131,11 +131,11 @@ Use a disposable Laravel application outside this repository for native browser 
 
 Verify pending/refused states with zero optional requests, grant/library/initialization order, duplicate prevention, persisted refusal after reload, declared cookie deletion, published assets, cooperative cleanup, in-flight withdrawal, and modules with imports/top-level await. Test rejection of an intentionally invalid inline nonce under a nonce-only CSP and confirm that the block's dependent script cannot run. Use the host server's request log to independently check network activation. Test the banner with the [interface verification checklist](interface.md#verification).
 
-## Google presets in beta.4
+## Google presets
 
 The runtime now includes the optional gtag.js bridge and GA4/Google Ads presets. See the [Google guide](google.md) for `Consent.google.state()` and `Consent.google.event(destination, name, parameters)`, Basic/Advanced behavior, signal ordering, destination routing, and mandatory active-preset reload. Custom blocks retain their existing gates in both modes. External modules use an additional nonce-bearing import marker after their original SRI-checked load to wait for imports and top-level await before dependent scripts.
 
-## Meta Pixel and Microsoft Clarity in beta.5
+## Meta Pixel and Microsoft Clarity
 
 `Consent.meta.track(name, parameters, options)` and `trackCustom` send guarded Meta events. `Consent.clarity.event(name)` sends a guarded Clarity custom event; `Consent.clarity.state()` inspects frozen Consent API v2 signals without loading its SDK. Both presets are disabled by default, use strict category gates, preserve permission at invocation/dispatch, and discard denied events without later replay.
 

@@ -2,7 +2,7 @@
 
 A Laravel package for service-based cookie preferences and versioned consent persistence, with accessible customizable banners and browser script gating.
 
-**Current release: `v1.0.0-beta.5`.** This beta adds Meta Pixel and Microsoft Clarity presets with strict loading gates, guarded events, separate Clarity advertising consent, and withdrawal. Google Consent Mode v2, GA4 and Google Ads remain available. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. GTM is deferred. The package does not certify the accessibility or EU legal compliance of the host website.
+**Current release: `v1.0.0`.** Includes Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The default interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
 ## Google presets
 
@@ -54,24 +54,10 @@ The package supplies consent components for the consuming application's layout. 
 
 ## Installation
 
-The package is under development. To use this checkout in a Laravel application, add a local path repository to the application's `composer.json`:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../consent-for-laravel",
-            "options": { "symlink": true }
-        }
-    ]
-}
-```
-
-Then run:
+Install in your Laravel application with Composer:
 
 ```bash
-composer require webcrafts-studio/consent-for-laravel:@dev
+composer require webcrafts-studio/consent-for-laravel
 php artisan vendor:publish --tag=consent-config
 ```
 
@@ -395,7 +381,7 @@ Three versions have separate roles:
 - `schemaVersion` identifies the supported cookie format.
 - `policy_version` is an application-owned string. Increment it whenever the consent policy or purposes change beyond the registered metadata.
 
-`servicesVersion` is calculated from enabled service IDs, categories, names, descriptions, and non-empty cookie cleanup rules. Adding, enabling, disabling, removing, renaming, or changing the purpose/category/rules of an active service invalidates existing decisions. Reordering services, trimming outer whitespace, and editing disabled service metadata do not. Existing beta.1 fingerprints are preserved when cookie rules are absent or empty.
+`servicesVersion` is calculated from enabled service IDs, categories, names, descriptions, and non-empty cookie cleanup rules. Adding, enabling, disabling, removing, renaming, or changing the purpose/category/rules of an active service invalidates existing decisions. Reordering services, trimming outer whitespace, and editing disabled service metadata do not. Existing fingerprints are preserved when cookie rules are absent or empty.
 
 Acceptance and rejection both expire after `retention_days`, defaulting to 180. The setting accepts an integer from 1 to 365. Reads do not renew it. Expiry is checked at the exact second, even if a stale cookie is still present. Shortening retention invalidates decisions exceeding the new limit; increasing it does not extend an existing decision.
 
@@ -417,20 +403,11 @@ Acceptance and rejection both expire after `retention_days`, defaulting to 180. 
 
 The default is a first-party, host-only cookie, scoped to `/`, with `SameSite=Lax`. `secure: null` follows the request's HTTPS status. Configure Laravel's trusted proxies correctly behind a reverse proxy, or set `secure: true` on HTTPS-only deployments. `same_site` accepts `lax` or `strict`. Partial cookie configuration retains the other defaults.
 
-The provider excludes only the configured preference cookie from Laravel's encryption middleware. It is intentionally readable by the runtime and uses `HttpOnly=false`. Session and CSRF cookie names are rejected as configuration collisions. [Laravel's cookie encryption behavior](https://laravel.com/framework/docs/13.x/responses#cookies-and-encryption).
+The provider excludes only the configured preference cookie from Laravel's encryption middleware. It is intentionally readable by the runtime and uses `HttpOnly=false`. Session and CSRF cookie names and names starting with `remember_` are rejected as configuration collisions. [Laravel's cookie encryption behavior](https://laravel.com/framework/docs/13.x/responses#cookies-and-encryption).
 
 The cookie stores preferences and version/timestamp metadata, without identity, IP address, or a visitor identifier. It is unsigned and user-editable: use it only for consent preferences, never authentication, authorization, or evidence of who made a decision. Malformed, incomplete, future-dated, overlong, expired, or incompatible values fail closed. The package has no database audit trail.
 
 Responses passed to `persist()` or `forget()` receive `Cache-Control: private, no-store`. Do not share-cache personalized server-rendered consent output. Rebuild configuration and restart long-running workers after configuration changes. If the cookie name, path, or domain changes, old cookies must be cleaned up using their old scope; the new scope cannot delete them.
-
-## Next betas
-
-- `beta.4` (implemented): Google Consent Mode v2, GA4, and Google Ads.
-- `beta.5`: Meta Pixel and Microsoft Clarity, implemented with guarded events and withdrawal.
-- `beta.6`: integrated verification, documentation, and release preparation.
-- GTM: deferred, with no assigned beta.
-
-These are implemented and planned milestones. More betas can be released for fixes before `v1.0.0`. The head and banner views, interface translations, and browser assets can be published.
 
 ## Development
 
@@ -441,7 +418,7 @@ composer format
 composer check
 ```
 
-Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the beta release notes](docs/releases/v1.0.0-beta.4.md) for this release's scope.
+Node is used only for package development tests. The package follows [Spatie's Laravel package conventions](https://github.com/spatie/package-skeleton-laravel), using [Laravel Package Tools](https://github.com/spatie/laravel-package-tools). See [CONTRIBUTING.md](CONTRIBUTING.md) for compatibility checks and [the release notes](docs/releases/v1.0.0.md) for this release's scope.
 
 ## License
 

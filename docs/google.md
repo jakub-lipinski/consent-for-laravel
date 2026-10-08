@@ -1,6 +1,6 @@
 # Google Consent Mode v2 and presets
 
-Beta.4 adds a gtag.js consent bridge and built-in GA4 / Google Ads initialization. GTM is deferred with no assigned beta. The package is not a Google-certified CMP and does not certify a site's legal compliance.
+The package provides a gtag.js consent bridge and built-in GA4 / Google Ads initialization. The package is not a Google-certified CMP and does not certify a site's legal compliance.
 
 ## Quick setup
 
@@ -67,7 +67,7 @@ Every page begins with denied optional defaults, followed by the restored/curren
 | `functionality_storage` | Always denied; no functionality preset is supplied |
 | `security_storage` | Granted for necessary security storage |
 
-The bridge sets `ads_data_redaction: true` and `url_passthrough: false`. Presets disable Google signals and ad personalization signals; category acceptance does not enable these optional product features. Do not add conflicting global commands outside the package. Region-specific defaults, enhanced conversions, user ID, user-provided data, and arbitrary gtag configuration are not provided in this beta.
+The bridge sets `ads_data_redaction: true` and `url_passthrough: false`. Presets disable Google signals and ad personalization signals; category acceptance does not enable these optional product features. Do not add conflicting global commands outside the package. Region-specific defaults, enhanced conversions, user ID, user-provided data, and arbitrary gtag configuration are not provided by the package.
 
 ```javascript
 const signals = Consent.google.state();
@@ -93,7 +93,7 @@ const conversionQueued = await Consent.google.event(
 );
 ```
 
-`event(destination, name, parameters = {})` returns a promise resolving to `true` when the command was queued, or `false` when permission/initialization is unavailable. It waits for preset initialization and rechecks permission immediately before queueing. It does not remember denied events for later replay, confirm network delivery, or deduplicate transactions for you. Use your actual Ads conversion label; enabling Ads alone sends no conversion event. Keep personally identifying data out of ordinary event parameters and assess the provider's applicable data rules.
+`event(destination, name, parameters = {})` returns a promise resolving to `true` when the command was queued, or `false` when permission/initialization is unavailable. It captures JSON parameters and checks permission when called, waits for preset initialization, and rechecks permission immediately before queueing. It does not remember denied events for later replay, confirm network delivery, or deduplicate transactions for you. Use your actual Ads conversion label; enabling Ads alone sends no conversion event. Keep personally identifying data out of ordinary event parameters and assess the provider's applicable data rules.
 
 Invalid destinations, missing Ads labels, non-conversion Ads events, invalid event names, non-object parameters, and `send_to` / `event_callback` overrides reject with `TypeError`. GA4 uses its exact registered ID. Ads requires its registered `AW-...` ID plus a label of 1-128 letters, digits, underscores, or hyphens. Event names start with a letter and use letters, digits, or underscores up to 40 characters. Provider-specific event parameter validation remains the application's responsibility.
 
@@ -118,9 +118,9 @@ Match cleanup scopes to the cookies actually written by the vendor. Google can c
 
 These options declare deletion scope, not gtag cookie configuration. Additional scopes require custom cookie rules in separately named service definitions. Only declared visible first-party cookies can be removed; HttpOnly, third-party, other storage, or previous remote processing cannot be erased by this library.
 
-Active preset withdrawal always reloads, even if a custom `onRevoke` hook uses `reload: false`. Google has no complete cooperative stop lifecycle supplied by this beta. GA4 is disabled immediately on Basic denial and on active Advanced withdrawal, and Google receives denied consent before cleanup/reload. In Advanced, a subsequent refused document again runs the explicitly enabled cookieless mode.
+Active preset withdrawal always reloads, even if a custom `onRevoke` hook uses `reload: false`. Google has no complete cooperative stop lifecycle supplied by the package. GA4 is disabled immediately on Basic denial and on active Advanced withdrawal, and Google receives denied consent before cleanup/reload. In Advanced, a subsequent refused document again runs the explicitly enabled cookieless mode.
 
-Changing enabled targets, IDs, mode, page-view settings, canonical purposes, or cleanup rules changes the service fingerprint. Old decisions become pending. With the bridge disabled and presets inactive, beta.3 fingerprints are preserved. UI-only translations/positions/colors still do not invalidate consent.
+Changing enabled targets, IDs, mode, page-view settings, canonical purposes, or cleanup rules changes the service fingerprint. Old decisions become pending. With the bridge disabled and presets inactive, existing fingerprints are preserved. UI-only translations/positions/colors still do not invalidate consent.
 
 ## CSP and verification
 

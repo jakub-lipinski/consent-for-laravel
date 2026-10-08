@@ -1,6 +1,6 @@
 # Meta Pixel and Microsoft Clarity
 
-Beta.5 adds optional ID-based presets. Both stay disabled by default and use strict browser gates, independently of Google's Basic/Advanced setting. No Meta or Clarity library request is made while the required category is pending or denied. They do not use GTM.
+The package provides optional ID-based presets. Both stay disabled by default and use strict browser gates, independently of Google's Basic/Advanced setting. No Meta or Clarity library request is made while the required category is pending or denied.
 
 ## Setup
 
@@ -62,7 +62,7 @@ try {
 }
 ```
 
-`track(name, parameters = {}, options = {})` calls the vendor's `track`; `trackCustom` calls `trackCustom`. Use Meta standard event names with `track` and your own names with `trackCustom`. This beta owns one Pixel ID; do not initialize other pixels through the same `fbq` global.
+`track(name, parameters = {}, options = {})` calls the vendor's `track`; `trackCustom` calls `trackCustom`. Use Meta standard event names with `track` and your own names with `trackCustom`. The preset owns one Pixel ID; do not initialize other pixels through the same `fbq` global.
 
 Parameters must be an object with JSON-serializable data. The optional options object accepts only `eventID`, a non-empty string up to 128 characters, for your own event deduplication strategy. An event ID does not add a server-side integration or deduplicate every repeated browser call automatically. Do not include personal data or sensitive page contents in event parameters.
 
@@ -158,13 +158,13 @@ All preset bootstrap script elements inherit the head nonce, use the existing or
 
 For production CSP, permit the required script, connection, and image origins after reviewing the vendors' current policies. Clarity documents `*.clarity.ms` and `c.bing.com`; Meta's bootstrap origin is `connect.facebook.net`. A nonce alone does not authorize fetches or images. Keep a nonce/strict-dynamic policy where appropriate and scope vendor origins to the required directives instead of copying a broad unsafe-inline policy. Validate real SDK behavior and account events on your host.
 
-Local verification uses provider mocks to check queues, decisions, events, replacement APIs, cookie cleanup, timeout/race handling, nonce CSP, and UI behavior. It does not establish delivery to a live Pixel/Clarity project or certify legal compliance, vendor approval, or all assistive technologies. GTM is deferred with no assigned beta.
+Local verification uses provider mocks to check queues, decisions, events, replacement APIs, cookie cleanup, timeout/race handling, nonce CSP, and UI behavior. It does not establish delivery to a live Pixel/Clarity project or certify legal compliance, vendor approval, or all assistive technologies.
 
-## Upgrade from beta.4
+## Deploying presets
 
 Merge the new preset fields and English/Polish `messages.presets` translations. Reserved IDs are `meta-pixel`, `microsoft-clarity`, and, when advertising is enabled, `microsoft-clarity-ads`. Manual collisions are rejected. Customize views/translations deliberately and republish/cache-bust assets if using external files.
 
-The cookie schema is unchanged. With these new presets inactive, beta.4 fingerprints stay compatible, including Google-only installations. Enabling a preset or changing its ID, initialization options, purposes, advertising mode, or cleanup scope changes the service fingerprint and makes old decisions pending. Rebuild configuration and restart persistent workers.
+The cookie schema is unchanged. With these new presets inactive, existing fingerprints stay compatible, including Google-only installations. Enabling a preset or changing its ID, initialization options, purposes, advertising mode, or cleanup scope changes the service fingerprint and makes old decisions pending. Rebuild configuration and restart persistent workers.
 
 ## Primary references
 

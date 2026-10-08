@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.0.0 - Cookie consent for Laravel
+
+### Added
+
+- First stable release of the PHP, Blade, browser, and configuration APIs for PHP 8.3+ and Laravel 12-13.
+- Complete purpose-based preferences, three-position English/Polish interface, ordered cache-safe script gating, and consent withdrawal.
+- Google Consent Mode v2, GA4, Google Ads, Meta Pixel, and Microsoft Clarity presets with guarded events and provider-specific consent signals.
+- Standard Composer installation instructions and documentation covering implemented capabilities.
+
+### Fixed
+
+- Google events requested without consent are discarded even behind a queued acceptance; event parameters are captured at invocation.
+- Google command failures no longer interrupt withdrawal cleanup or required reload.
+- Preference cookie names cannot collide with Laravel remember-me cookies through the `remember_` prefix.
+
+### Changed
+
+- Exported archives exclude npm development manifests and locks.
+- Current documentation uses the stable release, with future integration promises removed.
+
+### Upgrade Notes
+
+- Unchanged service fingerprints and cookie schema 1 remain compatible. Refresh published assets/caches and merge customized resources.
+- Keep preference cookie names separate from session, CSRF, and remember-me cookies.
+- See [complete release notes](docs/releases/v1.0.0.md) for installation, available APIs, verification, and integration responsibilities.
+
 ## v1.0.0-beta.5 - Meta Pixel and Microsoft Clarity
 
 ### Added
