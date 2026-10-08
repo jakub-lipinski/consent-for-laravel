@@ -23,7 +23,7 @@ final readonly class Service
             'description' => $this->description,
         ];
 
-        // Preserve beta.1 fingerprints when no cleanup rules have been added.
+        // Preserve existing fingerprints when no cleanup rules have been added.
         if ($this->cookies !== []) {
             $definition['cookies'] = array_map(fn (CookieRule $cookie): array => $cookie->toArray(), $this->cookies);
         }

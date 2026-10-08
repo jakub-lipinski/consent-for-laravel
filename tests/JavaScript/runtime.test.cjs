@@ -628,6 +628,46 @@ test('Google events are routed only to their granted configured destination', as
     ]) await assert.rejects(p.api.google.event(...args), /Google|destination|Ads/);
 });
 
+test('Google does not replay an event invoked before a queued grant', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    const grant = p.api.acceptAll();
+    const event = p.api.google.event('G-ABCD1234', 'purchase', { value: 25 });
+    await grant;
+    assert.equal(await event, false);
+    await p.api.whenIdle();
+    assert.equal(commands(p).some(args => args[0] === 'event'), false);
+});
+
+test('Google snapshots event parameters and still checks permission after a queued withdrawal', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    await p.api.acceptAll();
+    const parameters = { value: 25, items: [{ item_id: 'original' }] };
+    const event = p.api.google.event('G-ABCD1234', 'purchase', parameters);
+    parameters.value = 99;
+    parameters.items[0].item_id = 'changed';
+    assert.equal(await event, true);
+    assert.deepEqual(commands(p).at(-1)[2], { value: 25, items: [{ item_id: 'original' }], send_to: 'G-ABCD1234' });
+    const withdrawal = p.api.rejectOptional();
+    const lateEvent = p.api.google.event('G-ABCD1234', 'purchase');
+    await withdrawal;
+    assert.equal(await lateEvent, false);
+    assert.equal(commands(p).filter(args => args[0] === 'event').length, 1);
+});
+
+test('a broken Google command queue cannot prevent consent withdrawal and reload', async t => {
+    const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
+    await p.api.acceptAll();
+    await p.api.whenIdle();
+    p.window.dataLayer.push = () => { throw new Error('Vendor queue failed'); };
+    await p.api.rejectOptional();
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.window['ga-disable-G-ABCD1234'], true);
+    assert.ok(p.errors.some(event => event.code === 'google'));
+    assert.ok(p.reloads.some(event => event.reason === 'revocation'));
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), false);
+});
+
 test('Google revocation updates all v2 signals before listeners and mandatory reload, even with custom cleanup', async t => {
     const p = await page(t, { config: { google: googleConfig() }, files: googleFiles });
     await p.api.acceptAll();

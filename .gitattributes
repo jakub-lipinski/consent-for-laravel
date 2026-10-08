@@ -11,3 +11,6 @@
 /pint.json export-ignore
 /testbench.yaml export-ignore
 /tests export-ignore
+
+/package.json export-ignore
+/package-lock.json export-ignore

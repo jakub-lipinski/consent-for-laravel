@@ -470,7 +470,12 @@
                     || window[`ga-disable-${target.id}`] === true && signals.analytics_storage === 'denied';
         }
         if (JSON.stringify(signals) !== JSON.stringify(googlePrevious)) {
-            googleCommand('consent', 'update', signals);
+            try {
+                googleCommand('consent', 'update', signals);
+            } catch (error) {
+                googleFailed = true;
+                report('google', error);
+            }
             googlePrevious = signals;
         }
     }
@@ -521,28 +526,35 @@
 
     const googleApi = Object.freeze({
         state: () => { sync(); return Object.freeze(googleSignals(current)); },
-        event: (destination, name, parameters = {}) => operation(async () => {
-            if (typeof destination !== 'string' || typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(name)
-                || !parameters || typeof parameters !== 'object' || Array.isArray(parameters)
-                || Object.hasOwn(parameters, 'send_to') || Object.hasOwn(parameters, 'event_callback')) {
-                throw new TypeError('Google events require a destination, event name, and parameters without send_to or event_callback.');
-            }
-            const target = config.google?.targets.find(target => target.id === destination
-                || target.category === 'marketing' && destination.startsWith(`${target.id}/`)
-                    && /^[A-Za-z0-9_-]{1,128}$/.test(destination.slice(target.id.length + 1)));
-            if (!target || target.category === 'marketing' && (name !== 'conversion' || destination === target.id)) {
-                throw new TypeError('Unknown Google destination or missing Ads conversion label.');
-            }
-            sync();
-            if (!canRun(target.category)) return false;
-            await initialized;
-            schedule();
-            await loadQueue;
-            sync();
-            if (!canRun(target.category) || !googleConfigured.has(target.id) || googleFailed) return false;
-            googleCommand('event', name, { ...parameters, send_to: destination });
-            return true;
-        }),
+        event: (destination, name, parameters = {}) => {
+            try {
+                if (typeof destination !== 'string' || typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(name)
+                    || !parameters || Object.prototype.toString.call(parameters) !== '[object Object]'
+                    || Object.hasOwn(parameters, 'send_to') || Object.hasOwn(parameters, 'event_callback')) {
+                    throw new TypeError('Google events require a destination, event name, and parameters without send_to or event_callback.');
+                }
+                const target = config.google?.targets.find(target => target.id === destination
+                    || target.category === 'marketing' && destination.startsWith(`${target.id}/`)
+                        && /^[A-Za-z0-9_-]{1,128}$/.test(destination.slice(target.id.length + 1)));
+                if (!target || target.category === 'marketing' && (name !== 'conversion' || destination === target.id)) {
+                    throw new TypeError('Unknown Google destination or missing Ads conversion label.');
+                }
+                const data = JSON.parse(JSON.stringify(parameters));
+                sync();
+                const permitted = canRun(target.category);
+                return operation(async () => {
+                    sync();
+                    if (!permitted || !canRun(target.category)) return false;
+                    await initialized;
+                    schedule();
+                    await loadQueue;
+                    sync();
+                    if (!canRun(target.category) || !googleConfigured.has(target.id) || googleFailed) return false;
+                    googleCommand('event', name, { ...data, send_to: destination });
+                    return true;
+                });
+            } catch (error) { return Promise.reject(error); }
+        },
     });
 
     const trackerRecords = new Map();

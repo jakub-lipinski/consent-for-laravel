@@ -28,6 +28,7 @@ it('validates consent settings', function (mixed $configuration) {
     'invalid cookie name' => [['cookie' => ['name' => 'bad;name']]],
     'session collision' => [['cookie' => ['name' => 'custom_session']]],
     'default session collision' => [['cookie' => ['name' => 'laravel_session']]],
+    'remember-me collision' => [['cookie' => ['name' => 'remember_web_'.sha1('auth-guard')]]],
     'CSRF collision' => [['cookie' => ['name' => 'XSRF-TOKEN']]],
     'relative path' => [['cookie' => ['path' => 'shop']]],
     'unsafe path' => [['cookie' => ['path' => "/shop\r\n"]]],

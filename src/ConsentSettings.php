@@ -55,8 +55,8 @@ final readonly class ConsentSettings
         $secure = $cookie['secure'];
         $sameSite = $cookie['same_site'];
 
-        if (! is_string($name) || ! preg_match('/\A[a-zA-Z][a-zA-Z0-9_.-]{0,63}\z/', $name) || in_array($name, ['XSRF-TOKEN', 'laravel_session', $sessionCookieName], true)) {
-            throw new InvalidArgumentException('consent.cookie.name must be a valid, separate cookie name, not a session or CSRF cookie.');
+        if (! is_string($name) || ! preg_match('/\A[a-zA-Z][a-zA-Z0-9_.-]{0,63}\z/', $name) || str_starts_with($name, 'remember_') || in_array($name, ['XSRF-TOKEN', 'laravel_session', $sessionCookieName], true)) {
+            throw new InvalidArgumentException('consent.cookie.name must be a valid, separate cookie name, not a session, remember-me, or CSRF cookie.');
         }
 
         if (! is_string($path) || ! str_starts_with($path, '/') || preg_match('/[;\x00-\x20\x7f]/', $path)) {
