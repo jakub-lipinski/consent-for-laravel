@@ -2,7 +2,7 @@
 
 Service-based cookie preferences for Laravel, with ready-made banners, a native preferences dialog, and consent-aware script loading. Configure your purposes, add two Blade components, and let visitors accept, refuse, or change their choices.
 
-PHP 8.3+ · Laravel 12–13 · MIT · No frontend framework, database, or npm build required in your application.
+PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required in your application. Database storage is optional.
 
 [Documentation](https://consent.lipinskijakub.pl/docs/introduction) · [Live preview](https://consent.lipinskijakub.pl/#preview) · [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel) · [Releases](https://github.com/jakub-lipinski/consent-for-laravel/releases)
 
@@ -117,6 +117,12 @@ No asset or translation publishing is required to use the defaults. Publish only
 
 Existing configs retain the light default; presentation changes preserve saved choices and their expiry. When upgrading customized views and published CSS, update them together using [the upgrade guidance](https://consent.lipinskijakub.pl/docs/upgrading#language-and-theme-update).
 
+## Optional decision audit log
+
+Enable `audit.enabled` after publishing and running the optional `consent-audit-migrations` migration. Explicit acceptance, refusal, preference changes, and withdrawal are stored with server timestamps and an immutable snapshot of the rendered banner/dialog, including custom wording and translations. The default remains disabled.
+
+New optional grants wait for a database receipt; refusal and withdrawal take effect locally immediately. Audit retention is separately configurable. See the [audit log guide](docs/audit-log.md) for installation, pruning, identity, caching, and failure behavior, and [v1.3.0 upgrade notes](docs/releases/v1.3.0.md#upgrade) when using published views or assets.
+
 ## Documentation and updates
 
 The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) contains the complete configuration reference and guides:
@@ -127,8 +133,6 @@ The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) 
 - [Upgrading](https://consent.lipinskijakub.pl/docs/upgrading), including earlier VCS installs, and [troubleshooting](https://consent.lipinskijakub.pl/docs/troubleshooting).
 
 Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
-
-See the [audit log guide](docs/audit-log.md) for optional database history, migrations, retention, and custom views.
 
 The browser-readable preference cookie is user-editable and must not be used for authorization or an audit trail. The package provides consent tooling; it does not certify legal compliance or the accessibility of your host website. Describe actual purposes and test the integrated application.
 

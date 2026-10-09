@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## v1.3.0 - Optional consent decision audit log
 
 - Add optional database decision history with signed, immutable banner/dialog snapshots, resolved custom translations, and original notices from cached HTML.
 - Record explicit acceptance, refusal, preference changes, and withdrawal with server timestamps, browser identity grouping, retry deduplication, and configurable pruning.
 - Require durable audit receipts before new optional grants. Apply refusal and withdrawal locally immediately even when audit delivery fails.
 - Add documented audit configuration, optional migrations, and PHP/browser edge-case tests. See the [audit log guide](docs/audit-log.md).
+- Existing configurations keep auditing disabled. Update customized banner views and published `consent.js` before enabling the feature.
+- See [release notes](docs/releases/v1.3.0.md).
 
 ## v1.2.0 - More languages, dark mode, and quieter diagnostics
 
