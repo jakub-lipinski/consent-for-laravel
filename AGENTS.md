@@ -2,7 +2,7 @@
 
 ## Scope
 
-This repository is a Composer library, `jakub-lipinski/consent-for-laravel`, not a Laravel application. Version 1.1 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, Standard/Compact variants of the three-position banner and native preferences dialog, validated colors, and English/Polish UI. Google Consent Mode v2, Basic/explicit Advanced gtag.js modes, and GA4/Google Ads presets are included. Meta Pixel and Microsoft Clarity presets are included with strict browser gating and mandatory reload after active withdrawal. Clarity advertising is opt-in and separately gated by marketing permission.
+This repository is a Composer library, `jakub-lipinski/consent-for-laravel`, not a Laravel application. Version 1.1 includes the PHP consent foundation, inert Blade script blocks, a framework-free browser runtime, ordered loading, consent withdrawal, Standard/Compact variants of the three-position banner and native preferences dialog, validated colors, and English/Polish UI. Version 1.2 adds seven bundled languages, custom locale fallback, configuration-only light/dark/auto themes with independent palettes, and cache-backed 72-hour diagnostic suppression. Google Consent Mode v2, Basic/explicit Advanced gtag.js modes, and GA4/Google Ads presets are included. Meta Pixel and Microsoft Clarity presets are included with strict browser gating and mandatory reload after active withdrawal. Clarity advertising is opt-in and separately gated by marketing permission.
 
 ## Conventions
 
