@@ -3,6 +3,10 @@
 use ConsentForLaravel\ConsentForLaravel\BannerSettings;
 use ConsentForLaravel\ConsentForLaravel\ConsentCodec;
 use ConsentForLaravel\ConsentForLaravel\ConsentManager;
+use Illuminate\Cache\FileStore;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Cache\Repository as CacheContract;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
@@ -68,7 +72,119 @@ it('does not let an unavailable diagnostics logger interrupt the host page', fun
     registerThemePage();
 
     $this->get('/theme-page')->assertOk()->assertSee('Host page survives')->assertSee('--consent-accent:#d86a32;', false);
+    $this->get('/theme-page')->assertOk()->assertSee('Host page survives');
 });
+
+it('logs identical diagnostics only once until exactly 72 hours have passed', function (array $ui) {
+    $this->freezeTime();
+    $started = now();
+    config(['consent.ui' => $ui]);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->twice();
+    app()->instance(LoggerInterface::class, $logger);
+    registerThemePage();
+
+    $this->get('/theme-page')->assertOk();
+    $this->get('/theme-page')->assertOk();
+    app(BannerSettings::class);
+    $logger->shouldHaveReceived('warning')->once();
+
+    $this->travelTo($started->copy()->addHours(72)->subSecond());
+    $this->get('/theme-page')->assertOk();
+    $logger->shouldHaveReceived('warning')->once();
+
+    $this->travelTo($started->copy()->addHours(72));
+    $this->get('/theme-page')->assertOk();
+    $this->get('/theme-page')->assertOk();
+    $logger->shouldHaveReceived('warning')->twice();
+})->with([
+    'contrast warnings' => [['validate_contrast' => true, 'colors' => ['accent' => '#d86a32']]],
+    'invalid color warnings with diagnostics disabled' => [['colors' => ['accent' => 'orange']]],
+]);
+
+it('reports a changed palette immediately even when it has the same contrast issues', function () {
+    config(['consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->twice();
+    app()->instance(LoggerInterface::class, $logger);
+    $first = app(BannerSettings::class);
+    config(['consent.ui.colors' => ['accent' => '#e08040']]);
+    $second = app(BannerSettings::class);
+    expect($first->colorWarnings)->toBe($second->colorWarnings);
+    config(['consent.ui.colors' => ['accent' => '#d86a32']]);
+    app(BannerSettings::class);
+});
+
+it('reports newly detected issues immediately when the resolved palette stays the same', function () {
+    config(['consent.ui.colors' => ['accent' => 'orange']]);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->twice();
+    app()->instance(LoggerInterface::class, $logger);
+    $first = app(BannerSettings::class);
+    config(['consent.ui.colors' => ['accent' => 'orange', 'focus' => 'blue']]);
+    $second = app(BannerSettings::class);
+    expect($first->colors)->toBe($second->colors)
+        ->and($first->colorWarnings)->not->toBe($second->colorWarnings);
+});
+
+it('does not repeat diagnostics after presentation changes or equivalent color configuration', function () {
+    config(['consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#D86A32', 'focus' => '#245C49']]);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->once();
+    app()->instance(LoggerInterface::class, $logger);
+    app(BannerSettings::class);
+    config(['consent.ui.variant' => 'compact', 'consent.ui.locale' => 'fr', 'consent.ui.position' => 'bottom-right', 'consent.ui.policy_url' => '/cookies']);
+    app(BannerSettings::class);
+    config(['consent.ui.colors' => ['focus' => '#245c49', 'accent' => '#d86a32']]);
+    app(BannerSettings::class);
+});
+
+it('persists diagnostic suppression across independent file cache instances', function () {
+    $path = sys_get_temp_dir().'/consent-theme-cache-'.bin2hex(random_bytes(8));
+    config(['consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldReceive('warning')->once();
+    app()->instance(LoggerInterface::class, $logger);
+    registerThemePage();
+    try {
+        foreach (range(1, 3) as $attempt) {
+            app()->instance(CacheContract::class, new CacheRepository(new FileStore(new Filesystem, $path)));
+            $this->get('/theme-page')->assertOk()->assertSee('--consent-accent:#d86a32;', false);
+        }
+    } finally {
+        (new Filesystem)->deleteDirectory($path);
+    }
+});
+
+it('skips logging when cache cannot claim the diagnostic interval and preserves page rendering', function (bool $throws) {
+    config(['consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
+    $cache = Mockery::mock(CacheContract::class);
+    $claim = $cache->shouldReceive('add')->twice();
+    if ($throws) {
+        $claim->andThrow(new RuntimeException('Diagnostic cache unavailable.'));
+    } else {
+        $claim->andReturn(false);
+    }
+    app()->instance(CacheContract::class, $cache);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldNotReceive('warning');
+    app()->instance(LoggerInterface::class, $logger);
+    registerThemePage();
+    $this->get('/theme-page')->assertOk()->assertSee('Host page survives')->assertSee('--consent-accent:#d86a32;', false);
+    $this->get('/theme-page')->assertOk()->assertSee('Host page survives');
+})->with(['cache exception' => true, 'claim rejected or cache write failed' => false]);
+
+it('does not access the diagnostic cache or logger when there are no warnings', function (bool $diagnostics) {
+    config(['consent.ui.validate_contrast' => $diagnostics]);
+    $cache = Mockery::mock(CacheContract::class);
+    $cache->shouldNotReceive('add');
+    app()->instance(CacheContract::class, $cache);
+    $logger = Mockery::mock(LoggerInterface::class);
+    $logger->shouldNotReceive('warning');
+    app()->instance(LoggerInterface::class, $logger);
+    registerThemePage();
+    $this->get('/theme-page')->assertOk();
+})->with([true, false]);
 
 it('reports no contrast issues for the default and custom accessible themes', function () {
     foreach ([[], ['accent' => '#263c76', 'focus' => '#263c76']] as $colors) {

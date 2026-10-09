@@ -2,6 +2,7 @@
 
 namespace ConsentForLaravel\ConsentForLaravel;
 
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -51,9 +52,13 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
             $settings = new BannerSettings($app->make(Repository::class)->get('consent.ui', []));
             if ($settings->colorWarnings !== []) {
                 try {
-                    $app->make(LoggerInterface::class)->warning('Consent UI theme requires attention.', ['issues' => $settings->colorWarnings]);
+                    $key = 'consent:ui-theme-warning:'.hash('sha256', json_encode([$settings->colors, $settings->colorWarnings], JSON_THROW_ON_ERROR));
+                    // Claim the interval before logging so concurrent requests cannot repeat the warning.
+                    if ($app->make(CacheRepository::class)->add($key, true, 72 * 60 * 60)) {
+                        $app->make(LoggerInterface::class)->warning('Consent UI theme requires attention.', ['issues' => $settings->colorWarnings]);
+                    }
                 } catch (Throwable) {
-                    // Optional theme diagnostics must not interrupt the host page if logging fails.
+                    // Optional diagnostics must not interrupt the page or bypass deduplication on cache/logging failure.
                 }
             }
 

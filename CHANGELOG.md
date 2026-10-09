@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Limit identical theme diagnostic logging attempts to once every 72 hours using the application's default cache. Changed palettes or detected issues can be reported immediately; cache/logger failures preserve rendering and do not bypass suppression.
 - Add German, French, Italian, Spanish, and European Portuguese interface translations, including accessible labels, status messages, category purposes, and preset descriptions.
 - Support application-provided translation locales without a language allowlist. Component/config/app locale selection, regional and script parents, and deterministic English fallback work with hyphen or underscore translation directories.
 - Resolve missing/blank UI and service translations per key without changing canonical service purposes, consent fingerprints, saved choices, or decision lifetimes. Document custom dictionaries and locale-aware HTML caching.

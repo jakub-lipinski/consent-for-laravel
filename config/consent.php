@@ -29,7 +29,8 @@ return [
         // Bundled: en, pl, de, fr, it, es, pt. Custom translation locales are supported.
         'locale' => null,
         'policy_url' => null,
-        // Optional contrast diagnostics in the application log; never interrupt rendering.
+        // Optional contrast diagnostics; identical theme warnings are limited to once per 72h.
+        // Uses the app's default cache store; cache/logging failures never interrupt rendering.
         'validate_contrast' => false,
         // Six-digit hex colors. Invalid values fall back to their defaults and log a warning.
         'colors' => [],

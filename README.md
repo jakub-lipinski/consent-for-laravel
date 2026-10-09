@@ -4,7 +4,7 @@ A Laravel package for service-based cookie preferences and versioned consent per
 
 **Current release: `v1.1.3`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
-The additional bundled languages and custom locale resolution documented below are currently unreleased.
+The additional bundled languages, custom locale resolution, and 72-hour theme-warning suppression documented below are currently unreleased.
 
 ## Requirements
 
@@ -182,6 +182,10 @@ Resolution checks the requested regional/script locale, its less-specific parent
 | `focus` | `#245c49` | Keyboard focus outline |
 
 Contrast diagnostics are opt-in: `ui.validate_contrast` defaults to `false`, including when the key is absent from existing published configuration. Set it to `true` to log warnings for combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. These warnings preserve the selected colors and never interrupt rendering, even if the logger fails. Invalid color formats fall back to the corresponding default; unknown color keys are ignored and a malformed colors array uses the default palette. These format problems log a warning regardless of the contrast flag, and unsafe values never enter CSS. The default palette meets these contrast thresholds; custom themes, CSS, and published view changes require their own accessibility checks. Changing colors or diagnostics does not invalidate or extend a saved consent decision.
+
+Theme warnings are grouped by the resolved palette and detected issues, with one logging attempt per group every **72 hours**. A changed palette or new issues can be reported immediately; language, variant, position, policy link, color-key ordering, and hex letter casing do not repeat the same warning. The package claims the interval through `add` on the application's default Laravel cache before logging. Use a persistent store supporting atomic `add` (such as file, Redis, or database) for suppression across requests and concurrent workers. File cache applies per server; a shared cache store applies across servers using the same cache namespace. An `array` store only suppresses within its current lifetime; a `null` store cannot retain the marker and does not log these diagnostics.
+
+No diagnostic cache operation is needed when there are no warnings. Cache exceptions, a failed/rejected cache claim, and logger failures never interrupt rendering. If the cache cannot claim the interval, the warning is skipped; if logging fails after a successful claim, the marker remains until expiry and the logging attempt is not repeated on every request. Clearing or evicting the marker permits an earlier logging attempt. Diagnostics use no visitor cookies, identity, or consent persistence, and require no new configuration keys.
 
 ### Translations and custom openers
 
