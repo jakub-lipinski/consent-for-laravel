@@ -1,6 +1,6 @@
 # Browser runtime
 
-The package provides script gating, a public browser API, and the [built-in cookie interface](interface.md). First [install from Packagist and publish the configuration](../README.md#installation), then include `<x-consent::head />` early in the layout. For custom scripts, register processing purposes in `consent.services` and wrap their script tags in `@consent('category', 'stable-id') ... @endconsent`. Built-in presets register and load their own integrations when enabled; they need no extra service definition or wrapper.
+The package provides script gating, a public browser API, and the [built-in cookie interface](interface.md). First [install from Packagist and publish the configuration](../README.md#install), then include `<x-consent::head />` early in the layout. For custom scripts, register processing purposes in `consent.services` and wrap their script tags in `@consent('category', 'stable-id') ... @endconsent`. Built-in presets register and load their own integrations when enabled; they need no extra service definition or wrapper.
 
 ## Execution lifecycle
 
@@ -119,7 +119,7 @@ Blocks require dependencies to appear before their initialization. A denied bloc
 
 ## CSP, caching, and cookie cleanup
 
-Default assets work without publishing. Use nonce props only when the consuming application generates a nonce and supplies a matching CSP header. See [published asset examples](../README.md#csp-and-published-assets) for the optional separate-file setup.
+Default assets work without publishing. Use nonce props only when the consuming application generates a nonce and supplies a matching CSP header. See [published asset examples](https://consent.lipinskijakub.pl/docs/csp-and-caching) for the optional separate-file setup.
 
 `<x-consent::head :nonce="$cspNonce" />` embeds the runtime and assigns the application's nonce to activated scripts that lack their own. A nonce must be generated per response and included in the CSP header. Hash-only inline policies may require an explicit nonce-based setup for dynamically activated scripts. The package does not loosen the application's CSP. The optional `src` attribute references a published runtime asset; do not add asynchronous loading if application scripts depend on immediate API availability.
 

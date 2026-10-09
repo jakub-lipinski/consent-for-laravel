@@ -4,7 +4,7 @@ The package provides optional ID-based presets. Both stay disabled by default an
 
 ## Setup
 
-First [install the package from Packagist and publish its configuration](../README.md#installation). Edit the existing entries in `config/consent.php`, keeping the other options and presets:
+First [install the package from Packagist and publish its configuration](../README.md#install). Edit the existing entries in `config/consent.php`, keeping the other options and presets:
 
 ```php
 'presets' => [
@@ -47,7 +47,7 @@ Remove previous vendor snippets, noscript pixels, tag-manager installations of t
 
 ## Meta Pixel
 
-The `meta-pixel` service uses `marketing`. Its default English/Polish purpose is shown automatically. The preset creates the vendor-compatible `fbq` queue with revoked consent, applies a current saved grant, then loads `https://connect.facebook.net/en_US/fbevents.js` only with marketing permission. It rechecks permission before `init` and the optional `PageView`. Initialization and automatic PageView happen once per document. There is no noscript tracking image, automatic matching payload, Conversions API request, or server-side event integration supplied by this preset.
+The `meta-pixel` service uses `marketing`. Its default localized purpose is shown automatically. The preset creates the vendor-compatible `fbq` queue with revoked consent, applies a current saved grant, then loads `https://connect.facebook.net/en_US/fbevents.js` only with marketing permission. It rechecks permission before `init` and the optional `PageView`. Initialization and automatic PageView happen once per document. There is no noscript tracking image, automatic matching payload, Conversions API request, or server-side event integration supplied by this preset.
 
 ### Standard and custom events
 
@@ -82,7 +82,7 @@ Review Events Manager's automatic events, matching, data-sharing, and event setu
 
 ## Microsoft Clarity
 
-The `microsoft-clarity` service uses `analytics`, with an English/Polish recording and heatmap purpose. The preset installs a queue stub and loads `https://www.clarity.ms/tag/PROJECT_ID` only after analytics permission. It uses the recommended `consentv2` API, including its exact case-sensitive keys. Calls address the current `window.clarity` because the SDK replaces the stub.
+The `microsoft-clarity` service uses `analytics`, with a localized recording and heatmap purpose. The preset installs a queue stub and loads `https://www.clarity.ms/tag/PROJECT_ID` only after analytics permission. It uses the recommended `consentv2` API, including its exact case-sensitive keys. Calls address the current `window.clarity` because the SDK replaces the stub.
 
 In your Clarity project, enable **Require cookie consent** and review masking before production. Microsoft excludes sites/apps targeting users under 18 from Clarity use; review provider eligibility. The package passes site-level consent signals; it does not register as a Microsoft CMP partner or send a fabricated CMP source ID.
 
@@ -164,7 +164,7 @@ Local verification uses provider mocks to check queues, decisions, events, repla
 
 ## Deploying presets
 
-Merge the new preset fields and English/Polish `messages.presets` translations. Reserved IDs are `meta-pixel`, `microsoft-clarity`, and, when advertising is enabled, `microsoft-clarity-ads`. Manual collisions are rejected. Customize views/translations deliberately and republish/cache-bust assets if using external files.
+Merge the preset fields and `messages.presets` entries in each application-owned dictionary. The additional bundled languages and custom locale fallback in this checkout are [unreleased](../README.md#unreleased-changes). Reserved IDs are `meta-pixel`, `microsoft-clarity`, and, when advertising is enabled, `microsoft-clarity-ads`. Manual collisions are rejected. Customize views/translations deliberately and republish/cache-bust assets if using external files.
 
 The cookie schema is unchanged. With these new presets inactive, existing fingerprints stay compatible, including Google-only installations. Enabling a preset or changing its ID, initialization options, purposes, advertising mode, or cleanup scope changes the service fingerprint and makes old decisions pending. Rebuild configuration and restart persistent workers.
 
