@@ -38,6 +38,62 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Decision Audit Log
+    |--------------------------------------------------------------------------
+    |
+    | Optional database history of explicit banner/API decisions, including
+    | refusal and withdrawal. Disabled by default; reading preferences or
+    | rendering a page never writes audit records or needs audit tables.
+    |
+    | Before enabling, publish and run the optional migration:
+    | php artisan vendor:publish --tag=consent-audit-migrations
+    | php artisan migrate
+    |
+    | Each decision references an immutable, signed copy of the rendered
+    | banner and dialog, resolved translations, service purposes, and UI
+    | settings. Changed wording creates a new notice on the next decision.
+    | Cached pages submit their original signed notice. A valid APP_KEY is
+    | required; previous keys in app.previous_keys support key rotation.
+    |
+    | No IP address, user-agent, email, or account ID is stored. A separate
+    | HttpOnly, signed cookie named {preference cookie name}_audit links
+    | browser decisions. It does not identify or authenticate a person.
+    |
+    | New optional grants wait for a durable server receipt. Refusal and
+    | withdrawal take effect locally immediately, even if logging fails.
+    | Failures emit consent:error with code audit and allow a manual retry.
+    |
+    */
+
+    'audit' => [
+        'enabled' => false,
+
+        // Null uses the application's default database connection.
+        'connection' => null,
+
+        // SQL identifiers, at most 40 characters. Set before migrating;
+        // keep these names and the connection stable after deployment.
+        'decisions_table' => 'consent_decisions',
+        'notices_table' => 'consent_notices',
+
+        // Same-origin JSON POST route, without session middleware or CORS.
+        // Rebuild route caches when enabling or changing this path.
+        // CSP must allow connect-src 'self'. Request limit: 60 KiB.
+        'path' => '/consent/decisions',
+
+        // Audit retention is independent of preference-cookie validity.
+        // Choose a period for your processing and evidence requirements.
+        // Schedule consent:audit-prune daily; no pruning runs on reads.
+        // Null disables pruning. 180 is a configurable default, not law.
+        'retention_days' => 180,
+
+        // Network deadline per attempt, 100-30000 ms. One retry uses the
+        // same event UUID; unique IDs prevent duplicate decision records.
+        'timeout_ms' => 5000,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Browser Timeouts
     |--------------------------------------------------------------------------
     |

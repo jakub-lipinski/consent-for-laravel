@@ -16,6 +16,7 @@
 @if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS || $ui->settings->darkColors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::DARK_COLORS)
 <style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{!! $ui->settings->variables(true) !!}{{ '}' }}</style>
 @endif
+@php ob_start(); try { @endphp
 <div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" data-consent-theme="{{ $ui->settings->theme }}" lang="{{ $languageTag }}" dir="ltr"
      data-message-saving="{{ $ui->text('saving', $language) }}" data-message-saved="{{ $ui->text('saved', $language) }}"
      data-message-changed="{{ $ui->text('changed', $language) }}" data-message-error="{{ $ui->text('save_failed', $language) }}"
@@ -89,6 +90,18 @@
     </button>
     <p class="consent-sr-only" role="status" aria-live="polite" aria-atomic="true" data-consent-status></p>
 </div>
+@php
+    } finally { $noticeHtml = ob_get_clean(); }
+    $notice = app(\ConsentForLaravel\ConsentForLaravel\AuditNotice::class)->seal($noticeHtml, $languageTag, $language, [
+        'variant' => $appearance, 'position' => $placement, 'policy_url' => $policy,
+        'theme' => $ui->settings->theme, 'colors' => $ui->settings->colors, 'dark_colors' => $ui->settings->darkColors,
+        'style_src' => $styleSrc, 'script_src' => $scriptSrc,
+    ]);
+@endphp
+{!! $noticeHtml !!}
+@if($notice !== null)
+<script type="application/json" data-consent-notice @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! json_encode($notice, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) !!}</script>
+@endif
 @if($scriptSrc !== null)
 <script src="{{ $scriptSrc }}" @if($nonce !== null) nonce="{{ $nonce }}" @endif></script>
 @else

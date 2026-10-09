@@ -6,6 +6,7 @@ use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Routing\Router;
 use Illuminate\View\Compilers\BladeCompiler;
 use Psr\Log\LoggerInterface;
 use Spatie\LaravelPackageTools\Package;
@@ -27,6 +28,12 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
     {
         $this->app->bind(ConsentSettings::class, fn (Application $app): ConsentSettings => new ConsentSettings(
             $app->make(Repository::class)->get('consent'),
+            $app->make(Repository::class)->get('session.cookie'),
+        ));
+
+        $this->app->bind(AuditSettings::class, fn (Application $app): AuditSettings => new AuditSettings(
+            $app->make(Repository::class)->get('consent.audit', []),
+            $app->make(ConsentSettings::class)->cookieName,
             $app->make(Repository::class)->get('session.cookie'),
         ));
 
@@ -70,6 +77,17 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
     {
         // Only the preferences cookie is readable by the browser. It contains no identity or authentication data.
         EncryptCookies::except($this->app->make(ConsentSettings::class)->cookieName);
+
+        $audit = $this->app->make(AuditSettings::class);
+        if ($audit->enabled) {
+            $this->app->make(Router::class)->post($audit->path, AuditController::class)->name('consent.audit.store');
+        }
+        $this->publishes([
+            __DIR__.'/../database/migrations/create_consent_audit_tables.php.stub' => database_path('migrations/2026_10_10_000000_create_consent_audit_tables.php'),
+        ], 'consent-audit-migrations');
+        if ($this->app->runningInConsole()) {
+            $this->commands([PruneAuditCommand::class]);
+        }
 
         $blade = $this->app->make(BladeCompiler::class);
         $blade->directive('consent', fn (string $expression): string => '<?php echo app(\\'.ScriptRenderer::class.'::class)->open('.$expression.'); ?>');

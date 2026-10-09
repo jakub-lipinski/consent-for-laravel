@@ -1103,3 +1103,159 @@ test('Meta rechecks external cookie changes after init before automatic PageView
     assert.equal(p.api.state().choices.marketing, false);
     assert.equal(p.reloads.length, 1);
 });
+
+const auditConfig = { path: '/consent/decisions', timeoutMs: 100 };
+const auditNoticeHtml = '<script type="application/json" data-consent-notice>{"payload":"signed cached notice","signature":"signature"}</script>';
+const auditReceipt = (options, status = 201) => ({ ok: status < 400, status, json: async () => ({ id: JSON.parse(options.body).id }) });
+
+test('audit is passive on load and refresh; grants await a matching durable receipt', async t => {
+    const requests = [];
+    let acknowledge;
+    const p = await page(t, {
+        config: { audit: auditConfig }, html: auditNoticeHtml + block('stats', 'analytics', inline('order.push("stats")')),
+        before(window) { window.fetch = (url, options) => { requests.push({ url, options }); return new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); }; },
+    });
+    p.api.state(); await p.api.refresh();
+    assert.equal(requests.length, 0);
+    const saving = p.api.choose({ analytics: true });
+    await delay(5);
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.deepEqual(plain(p.window.order), []);
+    assert.equal(requests[0].url, 'https://example.test/consent/decisions');
+    assert.equal(requests[0].options.keepalive, true);
+    assert.equal(requests[0].options.credentials, 'same-origin');
+    assert.equal(requests[0].options.redirect, 'error');
+    acknowledge(); await saving; await p.api.whenIdle();
+    assert.equal(p.api.allowed('analytics'), true);
+    assert.deepEqual(plain(p.window.order), ['stats']);
+});
+
+test('audit logs all explicit API actions with full choices and the original cached notice', async t => {
+    const requests = [];
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+        before(window) { window.fetch = async (url, options) => { requests.push(JSON.parse(options.body)); return auditReceipt(options); }; },
+    });
+    await p.api.acceptAll(); await p.api.choose({ analytics: true }); await p.api.rejectOptional(); await p.api.forget();
+    assert.deepEqual(requests.map(r => r.action), ['accept_all', 'save_preferences', 'reject_optional', 'withdraw']);
+    assert.equal(new Set(requests.map(r => r.id)).size, 4);
+    assert.equal(requests.every(r => r.notice.payload === 'signed cached notice'), true);
+    assert.equal(requests.every(r => Object.keys(r.choices).length === 5 && r.choices.necessary), true);
+    assert.equal(p.api.state().decidedAt, null);
+});
+
+test('audit retries transient failures with the same event ID and request body', async t => {
+    const requests = [];
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+        before(window) { window.fetch = async (url, options) => { requests.push(options.body); return auditReceipt(options, requests.length === 1 ? 503 : 201); }; },
+    });
+    await p.api.acceptAll();
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0], requests[1]);
+    assert.equal(p.api.allowed('analytics'), true);
+});
+
+test('audit failures block new grants while preserving a visible error event', async t => {
+    let attempts = 0;
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+        before(window) { window.fetch = async (url, options) => { attempts++; return auditReceipt(options, 503); }; },
+    });
+    await assert.rejects(p.api.acceptAll(), /503/);
+    assert.equal(attempts, 2);
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.state().decidedAt, null);
+    assert.equal(p.errors.filter(e => e.code === 'audit').length, 1);
+});
+
+test('audit rejection takes effect before a stalled request and survives its failure', async t => {
+    const config = configuration({ audit: auditConfig });
+    let requests = 0;
+    const p = await page(t, { config, state: decision(config), html: auditNoticeHtml + block('stats', 'analytics', inline('order.push("stats")')),
+        before(window) { window.fetch = (url, options) => { requests++; return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('deadline')))); }; },
+    });
+    assert.equal(p.api.allowed('analytics'), true);
+    const saving = p.api.rejectOptional();
+    const failure = assert.rejects(saving, /deadline/);
+    assert.equal(p.api.allowed('analytics'), false);
+    await delay(10);
+    assert.equal(p.reloads.length, 1);
+    await failure;
+    assert.equal(requests, 2);
+    assert.equal(p.api.allowed('analytics'), false);
+    const cookie = JSON.parse(decodeURIComponent(p.jar.getCookiesSync(url).find(c => c.key === 'consent_preferences').value));
+    assert.equal(cookie.choices.analytics, false);
+});
+
+test('audit withdrawal clears preferences immediately while delivery is stalled', async t => {
+    const config = configuration({ audit: auditConfig });
+    const p = await page(t, { config, state: decision(config), html: auditNoticeHtml,
+        before(window) { window.fetch = (url, options) => new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('deadline')))); },
+    });
+    const withdrawal = p.api.forget();
+    const failure = assert.rejects(withdrawal, /deadline/);
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.state().decidedAt, null);
+    assert.equal(p.jar.getCookiesSync(url).some(c => c.key === 'consent_preferences'), false);
+    await failure;
+});
+
+test('a later refusal prevents a late grant receipt from reactivating optional scripts', async t => {
+    const acknowledgements = [];
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml + block('stats', 'analytics', inline('order.push("stats")')),
+        before(window) { window.fetch = (url, options) => new Promise(resolve => acknowledgements.push(() => resolve(auditReceipt(options)))); },
+    });
+    const grant = p.api.acceptAll();
+    const refuse = p.api.rejectOptional();
+    assert.equal(p.api.allowed('analytics'), false);
+    acknowledgements[1](); await delay(1);
+    acknowledgements[0](); await Promise.all([grant, refuse]); await p.api.whenIdle();
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.deepEqual(plain(p.window.order), []);
+});
+
+test('mixed audit choices remove old grants immediately and delay newly granted categories', async t => {
+    const config = configuration({ audit: auditConfig });
+    let acknowledge;
+    const p = await page(t, { config, state: decision(config), html: auditNoticeHtml,
+        before(window) { window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+    });
+    const saving = p.api.choose({ marketing: true });
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.allowed('marketing'), false);
+    acknowledge(); await saving;
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.allowed('marketing'), true);
+    await p.api.whenIdle();
+});
+
+test('missing signed notice blocks grants and does not prevent refusal', async t => {
+    const config = configuration({ audit: auditConfig });
+    const p = await page(t, { config, state: decision(config) });
+    await assert.rejects(p.api.acceptAll(), /signed notice/);
+    const refusal = p.api.rejectOptional();
+    assert.equal(p.api.allowed('analytics'), false);
+    await assert.rejects(refusal, /signed notice/);
+});
+
+test('audit does not retry client rejection or an invalid receipt', async t => {
+    for (const invalidReceipt of [false, true]) {
+        let requests = 0;
+        const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+            before(window) { window.fetch = async (url, options) => { requests++; return invalidReceipt
+                ? { ok: true, status: 201, json: async () => ({ id: 'wrong' }) } : auditReceipt(options, 422); }; },
+        });
+        await assert.rejects(p.api.acceptAll());
+        assert.equal(requests, 1);
+        assert.equal(p.api.allowed('analytics'), false);
+    }
+});
+
+test('oversized audit notices are rejected without a network request or a new grant', async t => {
+    let requests = 0;
+    const html = `<script type="application/json" data-consent-notice>${JSON.stringify({ payload: 'x'.repeat(62000), signature: 'signature' })}</script>`;
+    const p = await page(t, { config: { audit: auditConfig }, html,
+        before(window) { window.fetch = async () => { requests++; throw new Error('unexpected request'); }; },
+    });
+    await assert.rejects(p.api.acceptAll(), /60 KiB/);
+    assert.equal(requests, 0);
+    assert.equal(p.api.allowed('analytics'), false);
+});

@@ -7,12 +7,13 @@ use RuntimeException;
 
 final readonly class BrowserRuntime
 {
-    public function __construct(private ConsentSettings $settings, private ServiceRegistry $services, private Repository $configuration) {}
+    public function __construct(private ConsentSettings $settings, private ServiceRegistry $services, private Repository $configuration, private AuditSettings $audit) {}
 
     /** @return array<string, mixed> */
     public function configuration(): array
     {
         return [
+            'audit' => $this->audit->enabled ? ['path' => $this->audit->path, 'timeoutMs' => $this->audit->timeoutMs] : null,
             'schemaVersion' => ConsentState::SCHEMA_VERSION,
             'policyVersion' => $this->settings->policyVersion,
             'servicesVersion' => $this->services->version(),
@@ -27,7 +28,7 @@ final readonly class BrowserRuntime
             ],
             'services' => array_values(array_map(fn (Service $service): array => $service->toArray(), $this->services->all())),
             'protectedCookies' => array_values(array_unique(array_filter([
-                $this->settings->cookieName, 'XSRF-TOKEN', 'laravel_session', $this->configuration->get('session.cookie'),
+                $this->settings->cookieName, $this->audit->cookieName, 'XSRF-TOKEN', 'laravel_session', $this->configuration->get('session.cookie'),
             ], is_string(...)))),
             'scriptTimeoutMs' => $this->settings->scriptTimeoutMs,
             'cleanupTimeoutMs' => $this->settings->cleanupTimeoutMs,

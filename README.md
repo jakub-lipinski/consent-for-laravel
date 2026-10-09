@@ -12,6 +12,7 @@ PHP 8.3+ · Laravel 12–13 · MIT · No frontend framework, database, or npm bu
 - English, Polish, German, French, Italian, Spanish, and European Portuguese, plus custom languages with per-key fallback.
 - Configuration-only light, dark, and automatic themes, with independent color palettes for both variants.
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
+- Optional database audit history with signed copies of the rendered banner and preferences dialog.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
 - GA4, Google Ads, Meta Pixel, and Microsoft Clarity presets, including Google Consent Mode v2.
 - Consent withdrawal with declared cookie cleanup and a default reload when optional code is already running.
@@ -126,6 +127,8 @@ The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) 
 - [Upgrading](https://consent.lipinskijakub.pl/docs/upgrading), including earlier VCS installs, and [troubleshooting](https://consent.lipinskijakub.pl/docs/troubleshooting).
 
 Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
+
+See the [audit log guide](docs/audit-log.md) for optional database history, migrations, retention, and custom views.
 
 The browser-readable preference cookie is user-editable and must not be used for authorization or an audit trail. The package provides consent tooling; it does not certify legal compliance or the accessibility of your host website. Describe actual purposes and test the integrated application.
 

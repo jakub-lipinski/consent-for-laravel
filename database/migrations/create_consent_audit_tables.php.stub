@@ -1,0 +1,41 @@
+<?php
+
+use ConsentForLaravel\ConsentForLaravel\AuditSettings;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        $settings = app(AuditSettings::class);
+        $schema = Schema::connection($settings->connection);
+        $schema->create($settings->noticesTable, function (Blueprint $table) {
+            $table->id();
+            $table->char('fingerprint', 64)->unique();
+            $table->string('policy_version', 128);
+            $table->char('services_version', 64);
+            $table->string('locale', 85);
+            $table->json('snapshot');
+            $table->dateTime('created_at')->index();
+        });
+        $schema->create($settings->decisionsTable, function (Blueprint $table) use ($settings) {
+            $table->uuid('id')->primary();
+            $table->uuid('consent_id')->index();
+            $table->foreignId('notice_id')->constrained($settings->noticesTable)->restrictOnDelete();
+            $table->string('action', 32);
+            $table->json('choices');
+            $table->dateTime('recorded_at')->index();
+            $table->dateTime('expires_at')->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        $settings = app(AuditSettings::class);
+        $schema = Schema::connection($settings->connection);
+        $schema->dropIfExists($settings->decisionsTable);
+        $schema->dropIfExists($settings->noticesTable);
+    }
+};

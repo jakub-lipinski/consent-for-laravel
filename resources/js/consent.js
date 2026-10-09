@@ -35,6 +35,10 @@
                     || target.category === 'marketing' && /^AW-[1-9][0-9]{0,19}$/.test(target.id))))) {
             throw new Error('Invalid Google runtime configuration.');
         }
+        if (config.audit != null && (!/^\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+$/.test(config.audit.path)
+            || !Number.isInteger(config.audit.timeoutMs) || config.audit.timeoutMs < 100 || config.audit.timeoutMs > 30000)) {
+            throw new Error('Invalid consent audit configuration.');
+        }
         const trackers = config.trackers ?? {};
         if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity'].includes(key))
             || Object.hasOwn(trackers, 'meta') && (!trackers.meta || typeof trackers.meta !== 'object' || !/^[1-9][0-9]{0,19}$/.test(trackers.meta.id)
@@ -290,8 +294,61 @@
         return result;
     }
 
-    function choose(choices) {
-        return operation(async () => {
+    let auditRevision = 0;
+
+    async function auditDecision(action, state) {
+        if (!config.audit) return;
+        try {
+            const nodes = document.querySelectorAll('script[data-consent-notice]');
+            if (nodes.length !== 1) throw new Error('Consent audit requires exactly one signed notice from the banner.');
+            const notice = JSON.parse(nodes[0].textContent);
+            if (typeof notice?.payload !== 'string' || typeof notice.signature !== 'string') throw new Error('Invalid signed consent notice.');
+            const body = JSON.stringify({ id: window.crypto.randomUUID(), notice, action, choices: state.choices });
+            if (new TextEncoder().encode(body).byteLength > 61440) throw new Error('Consent audit request exceeds 60 KiB.');
+            const endpoint = new URL(config.audit.path, window.location.origin);
+            if (endpoint.origin !== window.location.origin) throw new Error('Consent audit must use the same origin.');
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), config.audit.timeoutMs);
+                try {
+                    const response = await window.fetch(endpoint.href, {
+                        method: 'POST', credentials: 'same-origin', mode: 'same-origin', redirect: 'error',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body, keepalive: true, signal: controller.signal,
+                    });
+                    if (!response.ok) {
+                        const error = new Error(`Consent audit failed (${response.status}).`);
+                        if (response.status < 500 || attempt === 1) throw Object.assign(error, { final: true });
+                        continue;
+                    }
+                    const receipt = await response.json();
+                    if (receipt?.id !== JSON.parse(body).id) throw Object.assign(new Error('Invalid consent audit receipt.'), { final: true });
+                    return;
+                } catch (error) {
+                    if (error?.final || attempt === 1) throw error;
+                } finally { clearTimeout(timer); }
+            }
+        } catch (error) {
+            report('audit', error);
+            throw error;
+        }
+    }
+
+    function persistLocal(next, source) {
+        try { write(next); clearDenial(); storageFailed = false; }
+        catch (error) {
+            storageFailed = true;
+            rememberDenial();
+            install(pending(), 'storage-error');
+            report('storage', error);
+            throw error;
+        }
+        install(next, source);
+    }
+
+    function choose(choices, action = 'save_preferences') {
+        let next, revision, audit;
+        try {
             if (reloading) throw new Error('A consent reload is in progress.');
             if (!choices || Object.prototype.toString.call(choices) !== '[object Object]') throw new TypeError('Consent choices must be an object.');
             const normalized = denied();
@@ -302,19 +359,69 @@
                 normalized[category] = choice;
             }
             const decidedAt = now();
-            const next = { ...pending(), choices: normalized, decidedAt, expiresAt: decidedAt + config.retentionDays * 86400 };
-            try { write(next); clearDenial(); storageFailed = false; }
-            catch (error) {
+            next = { ...pending(), choices: normalized, decidedAt, expiresAt: decidedAt + config.retentionDays * 86400 };
+            revision = ++auditRevision;
+            if (config.audit) {
+                // Start keepalive delivery before cleanup can trigger a reload.
+                audit = auditDecision(action, next);
+                // Observe eager failures even while another operation is awaiting its receipt.
+                audit.catch(() => {});
+                const reduced = { ...next, choices: Object.fromEntries(knownCategories.map(key =>
+                    [key, key === 'necessary' || normalized[key] && permits(current, key)])) };
+                // New grants wait for a receipt. Removals take effect immediately,
+                // including when a previous grant is still waiting on the network.
+                if (knownCategories.some(key => key !== 'necessary' && current.choices[key] && !normalized[key])
+                    || !knownCategories.some(key => key !== 'necessary' && normalized[key])) persistLocal(reduced, 'choice');
+            }
+        } catch (error) { return Promise.reject(error); }
+        return operation(async () => {
+            try {
+                if (audit) await audit;
+                if (config.audit && revision !== auditRevision) return snapshot(current);
+                persistLocal(next, 'choice');
+                await cleanupQueue;
+                return snapshot(current);
+            } catch (error) {
+                await cleanupQueue;
+                throw error;
+            }
+        });
+    }
+
+    function forget() {
+        let audit;
+        const revision = ++auditRevision;
+        const remove = () => {
+            try {
+                expireCookie(config.cookie.name, config.cookie.path, config.cookie.domain);
+                if (rawCookie() !== null) throw new Error('Consent preferences could not be removed.');
+                storageFailed = false;
+                clearDenial();
+            } catch (error) {
                 storageFailed = true;
                 rememberDenial();
                 install(pending(), 'storage-error');
                 report('storage', error);
+                throw error;
+            }
+            install(pending(), 'forget');
+        };
+        if (config.audit) {
+            audit = auditDecision('withdraw', pending());
+            audit.catch(() => {});
+            try { remove(); } catch (error) { return Promise.reject(error); }
+        }
+        return operation(async () => {
+            try {
+                if (audit) await audit;
+                else remove();
+                if (config.audit && revision !== auditRevision) return snapshot(current);
+                await cleanupQueue;
+                return snapshot(current);
+            } catch (error) {
                 await cleanupQueue;
                 throw error;
             }
-            install(next, 'choice');
-            await cleanupQueue;
-            return snapshot(current);
         });
     }
 
@@ -758,27 +865,10 @@
         state: () => snapshot(sync()),
         allowed: category => { checkCategory(category); sync(); return category === 'necessary' || canRun(category); },
         choose,
-        acceptAll: () => choose(Object.fromEntries(config.categories.map(key => [key, true]))),
-        rejectOptional: () => choose({}),
+        acceptAll: () => choose(Object.fromEntries(config.categories.map(key => [key, true])), 'accept_all'),
+        rejectOptional: () => choose({}, 'reject_optional'),
         openPreferences: () => !document.dispatchEvent(new CustomEvent('consent:open-preferences', { cancelable: true })),
-        forget: () => operation(async () => {
-            try {
-                expireCookie(config.cookie.name, config.cookie.path, config.cookie.domain);
-                if (rawCookie() !== null) throw new Error('Consent preferences could not be removed.');
-                storageFailed = false;
-                clearDenial();
-            } catch (error) {
-                storageFailed = true;
-                rememberDenial();
-                install(pending(), 'storage-error');
-                report('storage', error);
-                await cleanupQueue;
-                throw error;
-            }
-            install(pending(), 'forget');
-            await cleanupQueue;
-            return snapshot(current);
-        }),
+        forget,
         refresh: async () => { sync(); await cleanupQueue; return snapshot(current); },
         onChange: callback => {
             if (typeof callback !== 'function') throw new TypeError('Consent change callback must be a function.');

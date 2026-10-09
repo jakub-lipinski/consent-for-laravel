@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add optional database decision history with signed, immutable banner/dialog snapshots, resolved custom translations, and original notices from cached HTML.
+- Record explicit acceptance, refusal, preference changes, and withdrawal with server timestamps, browser identity grouping, retry deduplication, and configurable pruning.
+- Require durable audit receipts before new optional grants. Apply refusal and withdrawal locally immediately even when audit delivery fails.
+- Add documented audit configuration, optional migrations, and PHP/browser edge-case tests. See the [audit log guide](docs/audit-log.md).
+
 ## v1.2.0 - More languages, dark mode, and quieter diagnostics
 
 - Organize the published config into Laravel-style sections with supported options and commented color/service examples, preserving all configuration defaults.
