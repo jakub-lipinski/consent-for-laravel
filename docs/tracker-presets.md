@@ -164,7 +164,7 @@ Local verification uses provider mocks to check queues, decisions, events, repla
 
 ## Deploying presets
 
-Merge the preset fields and `messages.presets` entries in each application-owned dictionary. The additional bundled languages and custom locale fallback in this checkout are [unreleased](../README.md#unreleased-changes). Reserved IDs are `meta-pixel`, `microsoft-clarity`, and, when advertising is enabled, `microsoft-clarity-ads`. Manual collisions are rejected. Customize views/translations deliberately and republish/cache-bust assets if using external files.
+Merge the preset fields and `messages.presets` entries in each application-owned dictionary. Seven bundled languages and custom locale fallback are supported; see [translations](https://consent.lipinskijakub.pl/docs/translations). Reserved IDs are `meta-pixel`, `microsoft-clarity`, and, when advertising is enabled, `microsoft-clarity-ads`. Manual collisions are rejected. Customize views/translations deliberately and republish/cache-bust assets if using external files.
 
 The cookie schema is unchanged. With these new presets inactive, existing fingerprints stay compatible, including Google-only installations. Enabling a preset or changing its ID, initialization options, purposes, advertising mode, or cleanup scope changes the service fingerprint and makes old decisions pending. Rebuild configuration and restart persistent workers.
 

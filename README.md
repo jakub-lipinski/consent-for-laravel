@@ -2,21 +2,20 @@
 
 Service-based cookie preferences for Laravel, with ready-made banners, a native preferences dialog, and consent-aware script loading. Configure your purposes, add two Blade components, and let visitors accept, refuse, or change their choices.
 
-**Stable release: `v1.1.3`.** PHP 8.3+ · Laravel 12–13 · MIT · No frontend framework, database, or npm build required in your application.
+PHP 8.3+ · Laravel 12–13 · MIT · No frontend framework, database, or npm build required in your application.
 
 [Documentation](https://consent.lipinskijakub.pl/docs/introduction) · [Live preview](https://consent.lipinskijakub.pl/#preview) · [Packagist](https://packagist.org/packages/jakub-lipinski/consent-for-laravel) · [Releases](https://github.com/jakub-lipinski/consent-for-laravel/releases)
 
 ## What is included
 
 - Matching Standard and Compact banners/preferences dialogs, three positions, editable colors and wording, and a reopening button.
-- English and Polish translations in the stable release.
+- English, Polish, German, French, Italian, Spanish, and European Portuguese, plus custom languages with per-key fallback.
+- Configuration-only light, dark, and automatic themes, with independent color palettes for both variants.
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
 - GA4, Google Ads, Meta Pixel, and Microsoft Clarity presets, including Google Consent Mode v2.
 - Consent withdrawal with declared cookie cleanup and a default reload when optional code is already running.
 - Keyboard interaction, native modal semantics, responsive layouts, and optional non-blocking contrast diagnostics.
-
-The additional languages, custom locale fallback, dark mode, and 72-hour warning suppression in this checkout are [unreleased](#unreleased-changes).
 
 ## Install
 
@@ -94,31 +93,28 @@ The URL is a placeholder for your provider. The head component must precede gate
 
 ## Customize the interface
 
-Edit the existing `ui` section. These options work in stable `v1.1.3`:
+Edit the existing `ui` section in the Laravel-style config, which includes supported values and commented examples:
 
 ```php
 'variant' => 'compact',
 'position' => 'bottom-right',
+'theme' => 'auto',
 'locale' => null,
 'policy_url' => '/cookies',
 'validate_contrast' => false,
 'colors' => [],
+'dark_colors' => [],
 ```
 
-Choose `standard` or `compact`, and `bottom-left`, `bottom-right`, or `bottom-center`. A null locale follows the application; stable explicit overrides accept `en` or `pl`. Provide your own policy page. Empty colors inherit package defaults; override selected keys with six-digit HEX values. Contrast diagnostics preserve chosen colors and never interrupt rendering.
+Choose `standard` or `compact`, and `bottom-left`, `bottom-right`, or `bottom-center`. Set `theme` to `light` (default), `dark`, or `auto` to follow the browser/system preference. This is a config setting; no visitor-facing theme button is added. Empty `colors` and `dark_colors` inherit independent defaults; override selected keys with six-digit HEX values.
+
+A null locale follows the application. Choose a bundled language or add your own dictionary; missing keys inherit parent-language and English values. A valid locale without a dictionary safely falls back to English. Provide your own policy page.
+
+Contrast diagnostics check both palettes, preserve chosen colors, and never interrupt rendering. Identical palette/issue groups receive one logging attempt every 72 hours through the app's default cache. Cache/logger failures preserve rendering; persistent suppression requires a persistent cache store.
 
 No asset or translation publishing is required to use the defaults. Publish only for customization or external assets. See [banner and theme](https://consent.lipinskijakub.pl/docs/banner-and-theme), [translations](https://consent.lipinskijakub.pl/docs/translations), and [CSP and caching](https://consent.lipinskijakub.pl/docs/csp-and-caching).
 
-## Unreleased changes
-
-The following additions are implemented in this checkout but **not yet published on Packagist**:
-
-- German, French, Italian, Spanish, and European Portuguese, plus custom locales with per-key parent-language and English fallback.
-- Configuration-only `ui.theme`: `light`, `dark`, or `auto`, for both variants. Independent `colors` and `dark_colors` overrides default to empty arrays. No visitor-facing theme button is added.
-- Both-palette contrast diagnostics with one logging attempt per identical palette/issue group every 72 hours through the app's default cache. Cache/logger failures preserve rendering.
-- A config organized into Laravel-style sections, with supported values and commented color/service examples.
-
-Existing configs retain the light default; these presentation changes preserve saved choices and their expiry. Stable `v1.1.3` rejects the new `theme` and `dark_colors` keys. Use the [unreleased upgrade guidance](https://consent.lipinskijakub.pl/docs/upgrading#unreleased-ui-update) only after installing a version containing these additions; update customized views and published CSS together. No new version or tag is announced here.
+Existing configs retain the light default; presentation changes preserve saved choices and their expiry. When upgrading customized views and published CSS, update them together using [the upgrade guidance](https://consent.lipinskijakub.pl/docs/upgrading#language-and-theme-update).
 
 ## Documentation and updates
 

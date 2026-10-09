@@ -2,7 +2,7 @@
 
 Version 1.1 provides matching Standard and Compact interfaces through `<x-consent::banner />` alongside the head/runtime component. Both use ordinary HTML, scoped CSS, native checkbox controls, and a native `<dialog>` with no frontend framework. They target the applicable WCAG 2.2 A and AA criteria of this interface; the package does not certify an entire website or replace a site accessibility review.
 
-The light/dark/auto modes, additional bundled languages, custom locale fallback, and 72-hour diagnostic suppression described here are [unreleased additions](../README.md#unreleased-changes). Stable `v1.1.3` provides English/Polish, the light interface, and non-blocking diagnostics.
+The interface supports light/dark/auto modes, seven bundled languages, custom locale fallback, and non-blocking diagnostics with 72-hour warning suppression.
 
 ## Setup
 
@@ -116,7 +116,7 @@ Full axe checks found no violations in the tested version 1.1 banner and modal s
 
 Native testing used the Codex in-app browser. Actual screen reader announcements, other browser engines, high-contrast OS modes, and the complete host-site experience were not certified by these checks. The automated suite and native checks provide evidence for this release's interface behavior, not a blanket WCAG certification.
 
-### Unreleased language verification
+### Language verification
 
 On 2026-10-09, local validation used PHP 8.4.25, Laravel 13.35.0, and Node 22.21.1. `composer check` passed 321 Pest tests and 142 Node/jsdom tests, including all bundled languages in both variants and file-backed custom/regional translation tests. These are locally executed checks, not a claim that the entire configured PHP/Laravel CI matrix was run again.
 
@@ -124,13 +124,13 @@ A disposable Laravel host outside the package checkout was checked in the native
 
 Native keyboard checks confirmed dialog modality, initial heading focus, Tab/Shift+Tab wrapping, Escape cancellation, and opener focus restoration. Nonce-protected inline assets rendered under CSP, and an analytics-gated module with an import and top-level await stayed inert until acceptance and then ran in order before the following script. The application had no CSP violations at DOM readiness; subsequent browser tooling produced an anonymous blocked inline-style event, so that instrumentation event is not counted as a clean browser-console result. These checks do not establish screen-reader pronunciation or arbitrary custom/RTL layout accessibility.
 
-### Unreleased diagnostic logging verification
+### Diagnostic logging verification
 
 On 2026-10-09, `composer check` passed 331 Pest tests and 142 Node/jsdom tests on the same local PHP/Laravel/Node versions listed above. Focused tests covered suppression until the exact 72-hour boundary without extending the interval on repeated reads, immediate reporting for new palettes/issues, persistence across independent file-cache repositories, and rendering with unavailable cache/logging. This is local validation, not a rerun of the full configured CI matrix.
 
 In a separate disposable Laravel host with persistent file cache, five fresh HTTP requests (including a Standard-to-Compact and French-to-German change) produced one warning. A request with another problematic accent produced a second warning immediately. Both interfaces rendered with the selected colors, and the native dialog retained its initial heading focus and modality. The logging change does not alter markup, CSS, or browser scripts; the preceding language verification records those interface checks.
 
-### Unreleased theme verification
+### Theme verification
 
 On 2026-10-09, local `composer check` passed 362 Pest tests and 148 Node/jsdom tests with PHP 8.4.25, Laravel 13.35.0, and Node 22.21.1. Tests cover existing config defaults, strict theme validation, independent partial palettes, CSS/server default consistency, unsafe dark colors, nonce-protected inline overrides with published assets, configuration caching, both-palette diagnostics, 72-hour suppression, and unchanged consent gates/lifetimes. These are local checks, not a rerun of the full configured CI matrix.
 
