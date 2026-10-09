@@ -53,6 +53,30 @@ async function page(t, options = {}) {
 }
 async function idle(p) { await p.api.whenIdle(); await tick(); }
 
+for (const theme of ['light', 'dark', 'auto']) {
+    for (const variant of ['standard', 'compact']) {
+        test(`${theme} theme in ${variant} keeps consent gates and draft/save behavior`, async t => {
+            const input = { ui: { theme, variant } };
+            assert.deepEqual(fixture(input).config, fixture().config);
+            const p = await page(t, { input });
+            assert.equal(p.root.dataset.consentTheme, theme);
+            assert.equal(p.window.document.cookie, '');
+            p.button('open').click();
+            assert.equal(p.dialog.open, true);
+            p.field('analytics').click();
+            assert.equal(p.api.allowed('analytics'), false);
+            p.button('save', true).click();
+            await idle(p);
+            assert.equal(p.api.allowed('analytics'), true);
+            assert.equal(p.api.allowed('marketing'), false);
+            assert.equal(p.dialog.open, false);
+            assert.equal(p.launcher.hidden, false);
+            p.launcher.click();
+            assert.equal(p.field('analytics').checked, true);
+        });
+    }
+}
+
 test('pending banner appears without moving focus or writing a decision', async t => {
     const p = await page(t);
     assert.equal(p.banner.hidden, false);

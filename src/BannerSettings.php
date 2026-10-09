@@ -17,6 +17,19 @@ final readonly class BannerSettings
         'focus' => '#245c49',
     ];
 
+    public const DARK_COLORS = [
+        'background' => '#111b17',
+        'text' => '#edf4ef',
+        'muted' => '#b5c6bc',
+        'accent' => '#8dd8b4',
+        'accent_text' => '#10251b',
+        'border' => '#31473b',
+        'control' => '#8da99a',
+        'focus' => '#a5e4c4',
+    ];
+
+    public string $theme;
+
     public string $variant;
 
     public string $position;
@@ -28,6 +41,9 @@ final readonly class BannerSettings
     /** @var array<string, string> */
     public array $colors;
 
+    /** @var array<string, string> */
+    public array $darkColors;
+
     public bool $validateContrast;
 
     /** @var list<string> */
@@ -35,11 +51,15 @@ final readonly class BannerSettings
 
     public function __construct(mixed $configuration)
     {
-        if (! is_array($configuration) || array_diff(array_keys($configuration), ['variant', 'position', 'locale', 'policy_url', 'colors', 'validate_contrast']) !== []) {
-            throw new InvalidArgumentException('consent.ui must contain only variant, position, locale, policy_url, colors, and validate_contrast.');
+        if (! is_array($configuration) || array_diff(array_keys($configuration), ['variant', 'position', 'theme', 'locale', 'policy_url', 'colors', 'dark_colors', 'validate_contrast']) !== []) {
+            throw new InvalidArgumentException('consent.ui must contain only variant, position, theme, locale, policy_url, colors, dark_colors, and validate_contrast.');
         }
 
-        $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => [], 'validate_contrast' => false];
+        $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'theme' => 'light', 'locale' => null, 'policy_url' => null, 'colors' => [], 'dark_colors' => [], 'validate_contrast' => false];
+        if (! in_array($configuration['theme'], ['light', 'dark', 'auto'], true)) {
+            throw new InvalidArgumentException('Consent theme must be light, dark, or auto.');
+        }
+        $this->theme = $configuration['theme'];
         $this->variant = self::variant($configuration['variant']);
         $this->position = self::position($configuration['position']);
         $this->locale = $configuration['locale'] === null ? null : self::locale($configuration['locale']);
@@ -49,39 +69,50 @@ final readonly class BannerSettings
         if (! is_bool($configuration['validate_contrast'])) {
             $warnings[] = 'consent.ui.validate_contrast must be boolean; contrast diagnostics are disabled.';
         }
-        $colors = $configuration['colors'];
+        $this->colors = $this->resolveColors($configuration['colors'], self::COLORS, 'colors', 'light', $warnings);
+        $this->darkColors = $this->resolveColors($configuration['dark_colors'], self::DARK_COLORS, 'dark_colors', 'dark', $warnings);
+        $this->colorWarnings = $warnings;
+    }
+
+    /**
+     * @param  array<string, string>  $defaults
+     * @param  list<string>  $warnings
+     * @return array<string, string>
+     */
+    private function resolveColors(mixed $colors, array $defaults, string $option, string $theme, array &$warnings): array
+    {
         if (! is_array($colors)) {
-            $warnings[] = 'consent.ui.colors must be an array; using the default colors.';
+            $warnings[] = "consent.ui.{$option} must be an array; using the default {$theme} colors.";
             $colors = [];
         }
-        if (array_diff(array_keys($colors), array_keys(self::COLORS)) !== []) {
-            $warnings[] = 'consent.ui.colors contains unknown color keys; ignoring them.';
+        if (array_diff(array_keys($colors), array_keys($defaults)) !== []) {
+            $warnings[] = "consent.ui.{$option} contains unknown color keys; ignoring them.";
         }
-        $resolved = self::COLORS;
-        foreach (self::COLORS as $key => $default) {
+        $resolved = $defaults;
+        foreach ($defaults as $key => $default) {
             if (! array_key_exists($key, $colors)) {
                 continue;
             }
             $color = $colors[$key];
             if (! is_string($color) || ! preg_match('/\A#[a-fA-F0-9]{6}\z/', $color)) {
-                $warnings[] = "Consent color [{$key}] must be a six-digit hex color; using its default.";
+                $warnings[] = "Consent {$theme} color [{$key}] must be a six-digit hex color; using its default.";
 
                 continue;
             }
             $resolved[$key] = strtolower($color);
         }
-        $this->colors = $resolved;
         if ($this->validateContrast) {
             foreach (['text' => 4.5, 'muted' => 4.5, 'accent' => 4.5, 'control' => 3.0, 'focus' => 3.0] as $key => $minimum) {
-                if (self::contrast($this->colors[$key], $this->colors['background']) < $minimum) {
-                    $warnings[] = "Consent color [{$key}] has insufficient contrast against background (minimum {$minimum}:1).";
+                if (self::contrast($resolved[$key], $resolved['background']) < $minimum) {
+                    $warnings[] = "Consent {$theme} color [{$key}] has insufficient contrast against background (minimum {$minimum}:1).";
                 }
             }
-            if (self::contrast($this->colors['accent_text'], $this->colors['accent']) < 4.5) {
-                $warnings[] = 'Consent accent_text requires at least 4.5:1 contrast against accent.';
+            if (self::contrast($resolved['accent_text'], $resolved['accent']) < 4.5) {
+                $warnings[] = "Consent {$theme} accent_text requires at least 4.5:1 contrast against accent.";
             }
         }
-        $this->colorWarnings = $warnings;
+
+        return $resolved;
     }
 
     public static function locale(mixed $locale): string
@@ -138,9 +169,12 @@ final readonly class BannerSettings
         return $url;
     }
 
-    public function variables(): string
+    public function variables(bool $dark = false): string
     {
-        return implode('', array_map(fn (string $key, string $color): string => '--consent-'.str_replace('_', '-', $key).':'.$color.';', array_keys($this->colors), array_values($this->colors)));
+        $colors = $dark ? $this->darkColors : $this->colors;
+        $prefix = $dark ? '--consent-dark-' : '--consent-';
+
+        return implode('', array_map(fn (string $key, string $color): string => $prefix.str_replace('_', '-', $key).':'.$color.';', array_keys($colors), array_values($colors)));
     }
 
     public static function contrast(string $first, string $second): float

@@ -4,7 +4,7 @@ A Laravel package for service-based cookie preferences and versioned consent per
 
 **Current release: `v1.1.3`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
-The additional bundled languages, custom locale resolution, and 72-hour theme-warning suppression documented below are currently unreleased.
+The additional bundled languages, custom locale resolution, light/dark/auto themes, and 72-hour theme-warning suppression documented below are currently unreleased.
 
 ## Requirements
 
@@ -146,6 +146,7 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
 'ui' => [
     'variant' => 'standard',    // standard or compact; banner and preferences dialog
     'position' => 'bottom-left', // bottom-left, bottom-right, bottom-center
+    'theme' => 'light',         // light, dark, auto (browser/system preference)
     'locale' => null,           // Follow the app locale; or set a bundled/custom locale
     'policy_url' => '/cookies',
     'validate_contrast' => false, // true logs contrast warnings without interrupting the page
@@ -153,12 +154,17 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
         'accent' => '#245c49',
         'focus' => '#245c49',
     ],
+    'dark_colors' => [],       // Independent dark palette overrides; same keys
 ],
 ```
 
 `standard` preserves the original spacious card and preferences dialog. `compact` uses smaller cards/dialogs, less spacing, simpler corners, outlined choice buttons, and side-by-side acceptance/refusal on wider screens. In both variants, category purposes stay visible; complete service lists are initially collapsed in native, keyboard-accessible disclosures. Each has a visible arrow that changes direction when opened or closed. Both keep the same wording, actions, and consent behavior. Acceptance and refusal remain equally prominent. Compact changes presentation only and does not shorten purpose disclosures.
 
 Both variants support all three positions and validated colors. Left and right use a card; center uses a wide horizontal layout on larger screens. Actions stack on small screens, and long content scrolls vertically. The launcher follows the chosen position. Omitted `variant` settings in existing published configurations default to `standard`.
+
+`ui.theme` selects `light` (the default), `dark`, or `auto`. It is a configuration setting, with no visitor-facing theme button. `auto` uses CSS [`prefers-color-scheme`](https://www.w3.org/TR/mediaqueries-5/#prefers-color-scheme) and reacts to browser/system preference changes without a reload or additional JavaScript. Browsers without this media feature use light. The banner, native preferences dialog, fallback, and launcher share the selected palette in both variants. Scoped [`color-scheme`](https://www.w3.org/TR/css-color-adjust-1/#color-scheme-prop) also matches browser controls and scrollbars; it does not change the host page's theme. Existing configuration without `theme` keeps light.
+
+`colors` overrides the light palette and `dark_colors` overrides the dark palette. Both default to empty arrays; missing keys inherit the corresponding package defaults. Custom light colors are not converted into dark colors: configure both palettes independently when adapting your brand. Theme changes are presentation-only: they do not write preferences, reset an open draft, activate optional scripts, or change existing consent lifetimes. Refresh cached configuration after config changes, and update published views/assets when upgrading to theme support.
 
 Bundled UI locales are `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt` (European Portuguese). A component's `locale` overrides `ui.locale`; when both are null, the interface follows the application locale without changing it. Custom locales have no language allowlist. Locale identifiers must be language tags such as `nl`, `fr-CA`, or `pt_BR`; hyphens and underscores are accepted, and conventional casing is normalized. Per-component overrides are available:
 
@@ -168,22 +174,22 @@ Bundled UI locales are `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt` (European Po
 
 Resolution checks the requested regional/script locale, its less-specific parents, then English: for example `fr-CA` → `fr` → `en`, or `zh-Hant-TW` → `zh-Hant` → `zh` → `en`. Translation directories may use the normalized hyphen form (`fr-CA`) or Laravel's underscore form (`fr_CA`); when both exist, the hyphen form wins per key. The root `lang` attribute reflects the first locale with a nonempty UI dictionary. With no matching UI dictionary, the interface renders in English with `lang="en"`. Missing or blank keys fall through the same chain, independently of the application's fallback locale. Custom regional UI dictionaries can be partial.
 
-`policy_url` accepts an absolute website path or an HTTP(S) URL without credentials; null omits the link. Provide your site's actual cookie policy. Colors accept six-digit hex values. The available defaults are:
+`policy_url` accepts an absolute website path or an HTTP(S) URL without credentials; null omits the link. Provide your site's actual cookie policy. Colors accept six-digit hex values. The available keys and defaults are:
 
-| Color key | Default | Role |
-|---|---|---|
-| `background` | `#ffffff` | Card, dialog, and icon background |
-| `text` | `#182722` | Headings and ordinary text |
-| `muted` | `#52625b` | Descriptions and secondary text |
-| `accent` | `#245c49` | Choice buttons, links, and selected switches |
-| `accent_text` | `#ffffff` | Text and switch thumb on the accent |
-| `border` | `#e1e7e3` | Decorative dividers and card edges |
-| `control` | `#67776e` | Outlined controls and unchecked switches |
-| `focus` | `#245c49` | Keyboard focus outline |
+| Color key | Light default | Dark default | Role |
+|---|---|---|---|
+| `background` | `#ffffff` | `#111b17` | Card, dialog, and icon background |
+| `text` | `#182722` | `#edf4ef` | Headings and ordinary text |
+| `muted` | `#52625b` | `#b5c6bc` | Descriptions and secondary text |
+| `accent` | `#245c49` | `#8dd8b4` | Choice buttons, links, and selected switches |
+| `accent_text` | `#ffffff` | `#10251b` | Text and switch thumb on the accent |
+| `border` | `#e1e7e3` | `#31473b` | Decorative dividers and card edges |
+| `control` | `#67776e` | `#8da99a` | Outlined controls and unchecked switches |
+| `focus` | `#245c49` | `#a5e4c4` | Keyboard focus outline |
 
-Contrast diagnostics are opt-in: `ui.validate_contrast` defaults to `false`, including when the key is absent from existing published configuration. Set it to `true` to log warnings for combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. These warnings preserve the selected colors and never interrupt rendering, even if the logger fails. Invalid color formats fall back to the corresponding default; unknown color keys are ignored and a malformed colors array uses the default palette. These format problems log a warning regardless of the contrast flag, and unsafe values never enter CSS. The default palette meets these contrast thresholds; custom themes, CSS, and published view changes require their own accessibility checks. Changing colors or diagnostics does not invalidate or extend a saved consent decision.
+Contrast diagnostics are opt-in: `ui.validate_contrast` defaults to `false`, including when the key is absent from existing published configuration. Set it to `true` to log warnings for combinations below 4.5:1 for text, muted text, links, and button text, or below 3:1 for controls and focus against the UI background. Both palettes are checked, including the inactive one, and messages identify light or dark. These warnings preserve the selected colors and never interrupt rendering, even if the logger fails. Invalid color formats fall back to the corresponding default; unknown color keys are ignored and a malformed colors array uses the default palette. These format problems log a warning regardless of the contrast flag, and unsafe values never enter CSS. Both default palettes meet these contrast thresholds; custom themes, CSS, and published view changes require their own accessibility checks. Changing colors or diagnostics does not invalidate or extend a saved consent decision.
 
-Theme warnings are grouped by the resolved palette and detected issues, with one logging attempt per group every **72 hours**. A changed palette or new issues can be reported immediately; language, variant, position, policy link, color-key ordering, and hex letter casing do not repeat the same warning. The package claims the interval through `add` on the application's default Laravel cache before logging. Use a persistent store supporting atomic `add` (such as file, Redis, or database) for suppression across requests and concurrent workers. File cache applies per server; a shared cache store applies across servers using the same cache namespace. An `array` store only suppresses within its current lifetime; a `null` store cannot retain the marker and does not log these diagnostics.
+Theme warnings are grouped by both resolved palettes and detected issues, with one logging attempt per group every **72 hours**. A changed palette or new issues can be reported immediately; theme mode, language, variant, position, policy link, color-key ordering, and hex letter casing do not repeat the same warning. The package claims the interval through `add` on the application's default Laravel cache before logging. Use a persistent store supporting atomic `add` (such as file, Redis, or database) for suppression across requests and concurrent workers. File cache applies per server; a shared cache store applies across servers using the same cache namespace. An `array` store only suppresses within its current lifetime; a `null` store cannot retain the marker and does not log these diagnostics.
 
 No diagnostic cache operation is needed when there are no warnings. Cache exceptions, a failed/rejected cache claim, and logger failures never interrupt rendering. If the cache cannot claim the interval, the warning is skipped; if logging fails after a successful claim, the marker remains until expiry and the logging attempt is not repeated on every request. Clearing or evicting the marker permits an earlier logging attempt. Diagnostics use no visitor cookies, identity, or consent persistence, and require no new configuration keys.
 

@@ -7,11 +7,44 @@
     --consent-border: #e1e7e3;
     --consent-control: #67776e;
     --consent-focus: #245c49;
+    --consent-dark-background: #111b17;
+    --consent-dark-text: #edf4ef;
+    --consent-dark-muted: #b5c6bc;
+    --consent-dark-accent: #8dd8b4;
+    --consent-dark-accent-text: #10251b;
+    --consent-dark-border: #31473b;
+    --consent-dark-control: #8da99a;
+    --consent-dark-focus: #a5e4c4;
+    color-scheme: only light;
     color: var(--consent-text);
     font: normal 1rem/1.6 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     text-align: start;
     text-transform: none;
     overflow-wrap: anywhere;
+}
+.consent-ui[data-consent-theme="dark"] {
+    --consent-background: var(--consent-dark-background);
+    --consent-text: var(--consent-dark-text);
+    --consent-muted: var(--consent-dark-muted);
+    --consent-accent: var(--consent-dark-accent);
+    --consent-accent-text: var(--consent-dark-accent-text);
+    --consent-border: var(--consent-dark-border);
+    --consent-control: var(--consent-dark-control);
+    --consent-focus: var(--consent-dark-focus);
+    color-scheme: only dark;
+}
+@media (prefers-color-scheme: dark) {
+    .consent-ui[data-consent-theme="auto"] {
+        --consent-background: var(--consent-dark-background);
+        --consent-text: var(--consent-dark-text);
+        --consent-muted: var(--consent-dark-muted);
+        --consent-accent: var(--consent-dark-accent);
+        --consent-accent-text: var(--consent-dark-accent-text);
+        --consent-border: var(--consent-dark-border);
+        --consent-control: var(--consent-dark-control);
+        --consent-focus: var(--consent-dark-focus);
+        color-scheme: only dark;
+    }
 }
 .consent-ui *, .consent-ui *::before, .consent-ui *::after { box-sizing: border-box; }
 .consent-ui [hidden], .consent-ui .consent-dialog:not([open]) { display: none !important; }
@@ -99,6 +132,7 @@
 }
 .consent-launcher svg { width: 100%; height: 100%; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
 .consent-launcher circle { fill: currentColor; stroke: none; }
+.consent-ui .consent-launcher:focus-visible { box-shadow: 0 0 0 6px var(--consent-background), 0 4px 18px rgb(24 39 34 / .1); }
 .consent-ui[data-consent-position="bottom-right"] .consent-banner,
 .consent-ui[data-consent-position="bottom-right"] .consent-launcher { inset-inline-start: auto; inset-inline-end: 1.5rem; }
 .consent-ui[data-consent-position="bottom-center"] .consent-banner { inset-inline-start: 50%; transform: translateX(-50%); width: min(72rem, calc(100% - 3rem)); }

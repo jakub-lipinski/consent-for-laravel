@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add configuration-only `ui.theme` modes: light (backward-compatible default), dark, and auto via CSS browser/system preference. Both variants share themed banners, dialogs, fallbacks, and launchers, with scoped native control/scrollbar colors and independent `ui.dark_colors` overrides.
+- Validate both palettes, identify light/dark diagnostic issues, and include both resolved palettes in 72-hour warning suppression without changing saved consent or browser script gates.
+
 - Limit identical theme diagnostic logging attempts to once every 72 hours using the application's default cache. Changed palettes or detected issues can be reported immediately; cache/logger failures preserve rendering and do not bypass suppression.
 - Add German, French, Italian, Spanish, and European Portuguese interface translations, including accessible labels, status messages, category purposes, and preset descriptions.
 - Support application-provided translation locales without a language allowlist. Component/config/app locale selection, regional and script parents, and deterministic English fallback work with hyphen or underscore translation directories.

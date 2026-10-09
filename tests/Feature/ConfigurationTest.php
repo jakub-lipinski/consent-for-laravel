@@ -108,6 +108,8 @@ it('caches custom service and cookie configuration without closures or objects',
     $configuration['ui']['locale'] = 'nl_BE';
     $configuration['ui']['validate_contrast'] = true;
     $configuration['ui']['colors'] = ['accent' => '#d86a32'];
+    $configuration['ui']['theme'] = 'auto';
+    $configuration['ui']['dark_colors'] = ['accent' => '#a5e4c4'];
     $configuration['services'] = ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']];
     $configPath = config_path('consent.php');
     $cachePath = $this->app->getCachedConfigPath();
@@ -123,6 +125,8 @@ it('caches custom service and cookie configuration without closures or objects',
             ->and((new BannerSettings($cached['ui']))->locale)->toBe('nl-BE')
             ->and((new BannerSettings($cached['ui']))->validateContrast)->toBeTrue()
             ->and((new BannerSettings($cached['ui']))->colors['accent'])->toBe('#d86a32')
+            ->and((new BannerSettings($cached['ui']))->theme)->toBe('auto')
+            ->and((new BannerSettings($cached['ui']))->darkColors['accent'])->toBe('#a5e4c4')
             ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics');
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);

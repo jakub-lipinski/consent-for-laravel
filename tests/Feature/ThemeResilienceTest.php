@@ -100,6 +100,7 @@ it('logs identical diagnostics only once until exactly 72 hours have passed', fu
 })->with([
     'contrast warnings' => [['validate_contrast' => true, 'colors' => ['accent' => '#d86a32']]],
     'invalid color warnings with diagnostics disabled' => [['colors' => ['accent' => 'orange']]],
+    'dark contrast warnings' => [['validate_contrast' => true, 'dark_colors' => ['accent' => '#111b17']]],
 ]);
 
 it('reports a changed palette immediately even when it has the same contrast issues', function () {
@@ -218,7 +219,7 @@ it('preserves saved consent and its lifetime across theme diagnostics changes', 
     config(['consent.services' => ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']]]);
     $decision = app(ConsentManager::class)->choose(['analytics' => $allowed]);
     $cookie = app(ConsentCodec::class)->encode($decision);
-    config(['consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
+    config(['consent.ui.theme' => 'auto', 'consent.ui.dark_colors' => ['accent' => '#111b17'], 'consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
     Blade::render('<x-consent::banner />');
     $restored = app(ConsentManager::class)->read(Request::create('https://example.test/', cookies: ['consent_preferences' => $cookie]));
 

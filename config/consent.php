@@ -25,6 +25,8 @@ return [
         // Applies to both the banner and the preferences dialog.
         'variant' => 'standard', // standard or compact
         'position' => 'bottom-left',
+        // light, dark, or auto (browser/system preference). Defaults to light.
+        'theme' => 'light',
         // null follows the app locale. Regional -> base language -> English fallback.
         // Bundled: en, pl, de, fr, it, es, pt. Custom translation locales are supported.
         'locale' => null,
@@ -34,6 +36,8 @@ return [
         'validate_contrast' => false,
         // Six-digit hex colors. Invalid values fall back to their defaults and log a warning.
         'colors' => [],
+        // Same keys as colors; missing values use the separate dark palette.
+        'dark_colors' => [],
     ],
 
     // null enables the bridge automatically when a Google preset is enabled.

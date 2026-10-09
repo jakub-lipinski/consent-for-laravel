@@ -13,10 +13,10 @@
 @else
 <style @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! $ui->styles() !!}</style>
 @endif
-@if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS)
-<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{{ '}' }}</style>
+@if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS || $ui->settings->darkColors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::DARK_COLORS)
+<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{!! $ui->settings->variables(true) !!}{{ '}' }}</style>
 @endif
-<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" lang="{{ $languageTag }}" dir="ltr"
+<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" data-consent-theme="{{ $ui->settings->theme }}" lang="{{ $languageTag }}" dir="ltr"
      data-message-saving="{{ $ui->text('saving', $language) }}" data-message-saved="{{ $ui->text('saved', $language) }}"
      data-message-changed="{{ $ui->text('changed', $language) }}" data-message-error="{{ $ui->text('save_failed', $language) }}"
      data-message-leave="{{ $ui->text('leave_page', $language) }}">
