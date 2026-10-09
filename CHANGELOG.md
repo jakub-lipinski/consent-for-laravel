@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Organize the published config into Laravel-style sections with supported options and commented color/service examples, preserving all configuration defaults.
 - Add configuration-only `ui.theme` modes: light (backward-compatible default), dark, and auto via CSS browser/system preference. Both variants share themed banners, dialogs, fallbacks, and launchers, with scoped native control/scrollbar colors and independent `ui.dark_colors` overrides.
 - Validate both palettes, identify light/dark diagnostic issues, and include both resolved palettes in 72-hour warning suppression without changing saved consent or browser script gates.
 

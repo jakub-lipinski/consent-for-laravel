@@ -1,77 +1,192 @@
 <?php
 
 return [
-    // Increment when the purposes or consent policy change.
+
+    /*
+    |--------------------------------------------------------------------------
+    | Consent Policy
+    |--------------------------------------------------------------------------
+    |
+    | Increment the policy version when your purposes or consent policy change.
+    | Acceptance and refusal are remembered for the same number of days,
+    | measured from the visitor's decision.
+    |
+    */
+
     'policy_version' => '1',
 
-    // Acceptance and refusal have the same lifetime, measured from the decision.
     'retention_days' => 180,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Preference Cookie
+    |--------------------------------------------------------------------------
+    |
+    | Configure the cookie used to remember the visitor's preferences.
+    | A null domain creates a host-only cookie. A null secure value follows
+    | the request's HTTPS status; configure trusted proxies when needed.
+    |
+    */
 
     'cookie' => [
         'name' => 'consent_preferences',
         'path' => '/',
         'domain' => null,
-        // null follows the request's HTTPS status. Configure trusted proxies.
         'secure' => null,
         'same_site' => 'lax',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Browser Timeouts
+    |--------------------------------------------------------------------------
+    |
+    | Maximum time, in milliseconds, for loading external scripts and running
+    | cooperative cleanup when consent is withdrawn.
+    |
+    */
 
     'loader' => [
         'script_timeout_ms' => 15000,
         'cleanup_timeout_ms' => 3000,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Consent Interface
+    |--------------------------------------------------------------------------
+    |
+    | Appearance settings apply to the banner, preferences dialog, and launcher.
+    | A null locale follows the application locale, with parent-language and
+    | English fallbacks. Custom translation locales are also supported.
+    |
+    | Bundled languages: en, pl, de, fr, it, es, pt (European Portuguese).
+    |
+    */
+
     'ui' => [
-        // Applies to both the banner and the preferences dialog.
-        'variant' => 'standard', // standard or compact
+        // Supported: standard, compact.
+        'variant' => 'standard',
+
+        // Supported: bottom-left, bottom-right, bottom-center.
         'position' => 'bottom-left',
-        // light, dark, or auto (browser/system preference). Defaults to light.
+
+        // Supported: light, dark, auto (browser/system preference).
         'theme' => 'light',
-        // null follows the app locale. Regional -> base language -> English fallback.
-        // Bundled: en, pl, de, fr, it, es, pt. Custom translation locales are supported.
+
         'locale' => null,
+
+        // Optional policy link: '/privacy' or a full HTTP(S) URL.
         'policy_url' => null,
-        // Optional contrast diagnostics; identical theme warnings are limited to once per 72h.
-        // Uses the app's default cache store; cache/logging failures never interrupt rendering.
+
+        // Check both palettes. Identical theme warnings are logged once per
+        // 72 hours using the default cache store. Cache or logging failures
+        // never interrupt rendering.
         'validate_contrast' => false,
-        // Six-digit hex colors. Invalid values fall back to their defaults and log a warning.
-        'colors' => [],
-        // Same keys as colors; missing values use the separate dark palette.
-        'dark_colors' => [],
+
+        // Override light colors using six-digit HEX values.
+        // Missing or invalid values fall back to the light palette defaults.
+        // Invalid values produce a warning.
+        //
+        // Keys: background, text, muted, accent, accent_text,
+        //       border, control, focus.
+        'colors' => [
+            // 'accent' => '#245c49',
+            // 'accent_text' => '#ffffff',
+        ],
+
+        // Override dark colors using the same keys and format.
+        // Missing or invalid values fall back to the dark palette defaults.
+        'dark_colors' => [
+            // 'accent' => '#8dd8b4',
+            // 'accent_text' => '#10251b',
+        ],
     ],
 
-    // null enables the bridge automatically when a Google preset is enabled.
-    // true enables consent signals for your own gated gtag scripts; false disables it.
-    // Advanced explicitly allows Google tags and cookieless pings before permission.
-    'google' => ['enabled' => null, 'mode' => 'basic'],
+    /*
+    |--------------------------------------------------------------------------
+    | Google Consent Mode
+    |--------------------------------------------------------------------------
+    |
+    | A null enabled value activates the bridge when a Google preset is enabled.
+    | Set true for your own gated gtag scripts. Set false only when no Google
+    | presets are enabled.
+    |
+    | Basic mode waits for permission. Advanced mode explicitly allows Google
+    | tags and cookieless pings before permission.
+    |
+    */
 
-    // Presets register their services, cleanup rules, and browser initialization.
+    'google' => [
+        'enabled' => null,
+        'mode' => 'basic',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Built-in Integrations
+    |--------------------------------------------------------------------------
+    |
+    | Enable the integrations you use and provide their identifiers.
+    | Presets register services and manage script loading and withdrawal.
+    | All integrations are disabled by default.
+    |
+    */
+
     'presets' => [
         'ga4' => [
             'enabled' => false,
             'measurement_id' => env('CONSENT_GA4_ID'),
             'send_page_view' => true,
         ],
+
         'google_ads' => [
             'enabled' => false,
             'conversion_id' => env('CONSENT_GOOGLE_ADS_ID'),
         ],
+
         'meta_pixel' => [
             'enabled' => false,
             'pixel_id' => env('CONSENT_META_PIXEL_ID'),
             'send_page_view' => true,
         ],
+
         'clarity' => [
             'enabled' => false,
             'project_id' => env('CONSENT_CLARITY_ID'),
-            // Also requires marketing permission. Analytics alone never grants ad storage.
+
+            // Advertising also requires marketing permission.
             'advertising' => false,
         ],
     ],
 
-    // Custom services describe purposes. Gate their scripts with @consent.
-    // Each service requires category, name, description, and an optional boolean enabled.
-    // Optional cookies: [['name' => '_example', 'path' => '/', 'domain' => null]].
-    // Use prefix instead of name to match visible cookies with a known prefix.
-    'services' => [],
+    /*
+    |--------------------------------------------------------------------------
+    | Custom Services
+    |--------------------------------------------------------------------------
+    |
+    | Describe each service's purpose here, then gate its scripts with @consent.
+    | Registration alone does not load scripts. Each service requires a stable
+    | ID, category, name, and description. The enabled flag defaults to true.
+    |
+    | Categories: necessary, analytics, marketing, performance, other.
+    | Choose the category according to the service's actual purpose.
+    |
+    */
+
+    'services' => [
+        // 'site-analytics' => [
+        //     'category' => 'analytics',
+        //     'name' => 'Site analytics',
+        //     'description' => 'Measure visits and navigation.',
+        //     'enabled' => true,
+        //     'cookies' => [
+        //         ['name' => '_example', 'path' => '/', 'domain' => null],
+        //     ],
+        // ],
+        //
+        // Cookie cleanup rules accept either an exact name or a prefix.
+        // Replace 'name' with 'prefix' to match a family of visible cookies.
+    ],
+
 ];
