@@ -2,7 +2,8 @@
 @once
 @php
     $ui = app(\ConsentForLaravel\ConsentForLaravel\BannerView::class);
-    $language = $ui->locale($locale);
+    $language = $ui->requestedLocale($locale);
+    $languageTag = $ui->locale($locale);
     $appearance = \ConsentForLaravel\ConsentForLaravel\BannerSettings::variant($variant ?? $ui->settings->variant);
     $placement = \ConsentForLaravel\ConsentForLaravel\BannerSettings::position($position ?? $ui->settings->position);
     $policy = \ConsentForLaravel\ConsentForLaravel\BannerSettings::policyUrl($policyUrl ?? $ui->settings->policyUrl);
@@ -15,7 +16,7 @@
 @if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS)
 <style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{{ '}' }}</style>
 @endif
-<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" lang="{{ $language }}" dir="ltr"
+<div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" lang="{{ $languageTag }}" dir="ltr"
      data-message-saving="{{ $ui->text('saving', $language) }}" data-message-saved="{{ $ui->text('saved', $language) }}"
      data-message-changed="{{ $ui->text('changed', $language) }}" data-message-error="{{ $ui->text('save_failed', $language) }}"
      data-message-leave="{{ $ui->text('leave_page', $language) }}">

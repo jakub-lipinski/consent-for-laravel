@@ -25,7 +25,8 @@ return [
         // Applies to both the banner and the preferences dialog.
         'variant' => 'standard', // standard or compact
         'position' => 'bottom-left',
-        // null uses the application's locale, with English as the fallback.
+        // null follows the app locale. Regional -> base language -> English fallback.
+        // Bundled: en, pl, de, fr, it, es, pt. Custom translation locales are supported.
         'locale' => null,
         'policy_url' => null,
         // Optional contrast diagnostics in the application log; never interrupt rendering.

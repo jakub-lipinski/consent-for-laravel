@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add German, French, Italian, Spanish, and European Portuguese interface translations, including accessible labels, status messages, category purposes, and preset descriptions.
+- Support application-provided translation locales without a language allowlist. Component/config/app locale selection, regional and script parents, and deterministic English fallback work with hyphen or underscore translation directories.
+- Resolve missing/blank UI and service translations per key without changing canonical service purposes, consent fingerprints, saved choices, or decision lifetimes. Document custom dictionaries and locale-aware HTML caching.
+
 ## v1.1.3 - Non-blocking theme diagnostics
 
 - Color contrast no longer interrupts host-page rendering. `ui.validate_contrast` defaults to `false`; when enabled, it logs warnings and preserves the chosen colors.

@@ -17,37 +17,90 @@ final readonly class BannerView
 
     public function locale(?string $override = null): string
     {
-        $selected = $override ?? $this->settings->locale;
-        if ($selected !== null && ! in_array($selected, ['en', 'pl'], true)) {
-            throw new InvalidArgumentException('Consent UI locale must be en or pl.');
+        foreach ($this->locales($this->requestedLocale($override)) as $candidate) {
+            $messages = $this->translator->get('consent::messages', [], $candidate, false);
+            if (is_array($messages) && $messages !== []) {
+                return BannerSettings::locale($candidate);
+            }
         }
 
-        return $selected ?? (strtolower(explode('-', str_replace('_', '-', $this->translator->getLocale()))[0]) === 'pl' ? 'pl' : 'en');
+        return 'en';
+    }
+
+    public function requestedLocale(?string $override = null): string
+    {
+        $selected = $override ?? $this->settings->locale;
+        try {
+            $locale = BannerSettings::locale($selected ?? $this->translator->getLocale());
+        } catch (InvalidArgumentException $exception) {
+            if ($selected !== null) {
+                throw $exception;
+            }
+
+            $locale = 'en';
+        }
+
+        return $locale;
     }
 
     public function text(string $key, string $locale): string
     {
-        $text = $this->translator->get('consent::messages.'.$key, [], $locale);
+        $text = $this->translation('consent::messages.'.$key, $locale);
 
-        return is_string($text) ? $text : throw new InvalidArgumentException("Consent translation [{$key}] must be a string.");
+        return $text ?? throw new InvalidArgumentException("Consent translation [{$key}] is missing.");
     }
 
     public function serviceText(Service $service, string $field, string $locale): string
     {
         $key = 'consent::services.'.$service->id.'.'.$field;
-        $translated = $this->translator->get($key, [], $locale, false);
+        $translated = $this->translation($key, $locale);
 
         $defaults = GoogleSettings::SERVICE_DEFAULTS + TrackerSettings::SERVICE_DEFAULTS;
-        if ($translated === $key && isset($defaults[$service->id][$field])
+        if ($translated === null && isset($defaults[$service->id][$field])
             && $service->{$field} === $defaults[$service->id][$field]) {
             return $this->text('presets.'.$service->id.'.'.$field, $locale);
         }
 
-        return is_string($translated) && $translated !== $key && trim($translated) !== '' ? $translated : match ($field) {
+        return $translated ?? match ($field) {
             'name' => $service->name,
             'description' => $service->description,
             default => throw new InvalidArgumentException('Consent service translations support name and description.'),
         };
+    }
+
+    /** @return list<string> */
+    private function locales(string $locale): array
+    {
+        $parts = explode('-', BannerSettings::locale($locale));
+        $locales = [];
+        while ($parts !== []) {
+            $candidate = implode('-', $parts);
+            $locales[] = $candidate;
+            $locales[] = str_replace('-', '_', $candidate);
+            array_pop($parts);
+            // A language-tag extension cannot end with its singleton prefix.
+            if ($parts !== [] && strlen($parts[array_key_last($parts)]) === 1) {
+                array_pop($parts);
+            }
+        }
+        $locales[] = 'en';
+
+        return array_values(array_unique($locales));
+    }
+
+    private function translation(string $key, string $locale): ?string
+    {
+        foreach ($this->locales($locale) as $candidate) {
+            $text = $this->translator->get($key, [], $candidate, false);
+            if (! is_string($text)) {
+                throw new InvalidArgumentException("Consent translation [{$key}] must be a string.");
+            }
+            if ($text !== $key && trim($text) !== '') {
+                return $text;
+            }
+        }
+
+        return null;
     }
 
     public function styles(): string

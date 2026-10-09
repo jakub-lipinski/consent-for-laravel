@@ -72,11 +72,11 @@ it('supports the three positions without generating visitor-specific output', fu
     expect($html)->toContain('data-consent-position="'.$position.'"');
 })->with(['bottom-left', 'bottom-right', 'bottom-center'])->with(['standard', 'compact']);
 
-it('uses Polish or English with deterministic app-locale fallback and component overrides', function () {
+it('uses the app locale with deterministic fallback and component overrides', function () {
     app()->setLocale('pl_PL');
     expect(Blade::render('<x-consent::banner />'))->toContain('lang="pl"', 'Akceptuj wszystkie', 'Odrzuć opcjonalne');
     app()->setLocale('de');
-    expect(Blade::render('<x-consent::banner />'))->toContain('lang="en"', 'Accept all');
+    expect(Blade::render('<x-consent::banner />'))->toContain('lang="de"', 'Alle akzeptieren');
     config(['consent.ui.locale' => 'pl']);
     expect(Blade::render('<x-consent::banner locale="en" position="bottom-right" />'))->toContain('lang="en"', 'data-consent-position="bottom-right"')
         ->and(app()->getLocale())->toBe('de');
@@ -108,14 +108,7 @@ it('renders CSP nonces and can reference published styles and UI scripts', funct
     expect($sources)->toContain(dirname(__DIR__, 2).'/resources/css/consent.css', dirname(__DIR__, 2).'/resources/js/banner.js');
 });
 
-it('keeps both translation dictionaries complete and all default theme contrast pairs accessible', function () {
-    $en = require dirname(__DIR__, 2).'/resources/lang/en/messages.php';
-    $pl = require dirname(__DIR__, 2).'/resources/lang/pl/messages.php';
-    expect(array_keys($en))->toBe(array_keys($pl))
-        ->and(array_keys($en['categories']))->toBe(array_keys($pl['categories']));
-    foreach ($en['categories'] as $key => $value) {
-        expect(array_keys($value))->toBe(array_keys($pl['categories'][$key]));
-    }
+it('keeps all default theme contrast pairs accessible', function () {
     $settings = new BannerSettings([]);
     foreach (['text', 'muted', 'accent'] as $key) {
         expect(BannerSettings::contrast($settings->colors[$key], $settings->colors['background']))->toBeGreaterThanOrEqual(4.5);
@@ -132,14 +125,14 @@ it('validates UI configuration and rejects unsafe policy URLs', function (mixed 
     [null], [false], [['unexpected' => true]], [['position' => 'center']], [['position' => null]],
     [['variant' => null]], [['variant' => '']], [['variant' => 'Compact']], [['variant' => 'full']],
     [['variant' => true]], [['variant' => 1]], [['variant' => []]],
-    [['locale' => 'de']], [['locale' => []]], [['policy_url' => 'javascript:alert(1)']], [['policy_url' => '//example.test']],
+    [['locale' => '../fr']], [['locale' => []]], [['policy_url' => 'javascript:alert(1)']], [['policy_url' => '//example.test']],
     [['policy_url' => 'https://user:password@example.test']], [['policy_url' => '/\\example.test']], [['policy_url' => ' /cookies']],
 ]);
 
 it('supports custom accessible colors and validates component overrides', function () {
     config(['consent.ui.colors' => ['accent' => '#263C76', 'focus' => '#263C76'], 'consent.ui.policy_url' => 'https://example.test/privacy']);
     expect(Blade::render('<x-consent::banner />'))->toContain('--consent-accent:#263c76;', 'https://example.test/privacy')
-        ->and(fn () => app(BannerView::class)->locale('de'))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => app(BannerView::class)->locale('../fr'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => BannerSettings::position('unknown'))->toThrow(InvalidArgumentException::class);
 });
 

@@ -4,6 +4,8 @@ A Laravel package for service-based cookie preferences and versioned consent per
 
 **Current release: `v1.1.3`.** Includes matching Standard and Compact banners/preferences dialogs, Google Consent Mode v2, GA4, Google Ads, Meta Pixel and Microsoft Clarity presets, guarded events, and consent withdrawal. The built-in interface targets applicable WCAG 2.2 A and AA criteria, with automated and native browser verification. The package does not certify the accessibility or EU legal compliance of the host website.
 
+The additional bundled languages and custom locale resolution documented below are currently unreleased.
+
 ## Requirements
 
 - PHP 8.3+.
@@ -31,7 +33,7 @@ composer show jakub-lipinski/consent-for-laravel
 
 Publishing `consent-config` creates `config/consent.php`. All presets are disabled and custom `services` is empty by default. With both components mounted and no optional purpose enabled, only the preferences launcher appears. Enable the presets you use and supply their IDs, or register and gate your custom scripts.
 
-The default components embed the installed JavaScript and CSS, and include English/Polish translations without publishing them. Publish `consent-assets` only for separate browser files, `consent-views` for markup overrides, or `consent-translations` for wording changes. The package does not register routes. Use the built-in Blade interface, the browser API with your own interface, or the PHP API from your application's controllers or services.
+The default components embed the installed JavaScript and CSS, and include English, Polish, German, French, Italian, Spanish, and European Portuguese translations without publishing them. Custom translation locales are also supported. Publish `consent-assets` only for separate browser files, `consent-views` for markup overrides, or `consent-translations` for wording changes. The package does not register routes. Use the built-in Blade interface, the browser API with your own interface, or the PHP API from your application's controllers or services.
 
 For earlier VCS installs, see [switching to Packagist](#switching-from-vcs). For discovery or publishing problems, see [installation troubleshooting](#installation-troubleshooting).
 
@@ -144,7 +146,7 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
 'ui' => [
     'variant' => 'standard',    // standard or compact; banner and preferences dialog
     'position' => 'bottom-left', // bottom-left, bottom-right, bottom-center
-    'locale' => null,           // Follow the app locale; or explicitly en / pl
+    'locale' => null,           // Follow the app locale; or set a bundled/custom locale
     'policy_url' => '/cookies',
     'validate_contrast' => false, // true logs contrast warnings without interrupting the page
     'colors' => [
@@ -158,11 +160,13 @@ After a saved choice, a small cookie icon reopens preferences. A saved refusal s
 
 Both variants support all three positions and validated colors. Left and right use a card; center uses a wide horizontal layout on larger screens. Actions stack on small screens, and long content scrolls vertically. The launcher follows the chosen position. Omitted `variant` settings in existing published configurations default to `standard`.
 
-The application locale selects Polish for `pl`, including `pl_PL` / `pl-PL`, and English otherwise. An explicit UI locale must be `en` or `pl`. Per-component overrides are available:
+Bundled UI locales are `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt` (European Portuguese). A component's `locale` overrides `ui.locale`; when both are null, the interface follows the application locale without changing it. Custom locales have no language allowlist. Locale identifiers must be language tags such as `nl`, `fr-CA`, or `pt_BR`; hyphens and underscores are accepted, and conventional casing is normalized. Per-component overrides are available:
 
 ```blade
 <x-consent::banner variant="compact" locale="pl" position="bottom-right" policy-url="/cookies" />
 ```
+
+Resolution checks the requested regional/script locale, its less-specific parents, then English: for example `fr-CA` → `fr` → `en`, or `zh-Hant-TW` → `zh-Hant` → `zh` → `en`. Translation directories may use the normalized hyphen form (`fr-CA`) or Laravel's underscore form (`fr_CA`); when both exist, the hyphen form wins per key. The root `lang` attribute reflects the first locale with a nonempty UI dictionary. With no matching UI dictionary, the interface renders in English with `lang="en"`. Missing or blank keys fall through the same chain, independently of the application's fallback locale. Custom regional UI dictionaries can be partial.
 
 `policy_url` accepts an absolute website path or an HTTP(S) URL without credentials; null omits the link. Provide your site's actual cookie policy. Colors accept six-digit hex values. The available defaults are:
 
@@ -186,18 +190,34 @@ php artisan vendor:publish --tag=consent-translations
 php artisan vendor:publish --tag=consent-views
 ```
 
-Edit `lang/vendor/consent/en/messages.php` or `pl/messages.php` for interface wording. Keep category purposes accurate. Service names and purposes fall back to their canonical registry metadata. To translate them without changing the consent fingerprint, add `lang/vendor/consent/pl/services.php`:
+Edit `lang/vendor/consent/{locale}/messages.php` for interface wording, including category purposes, preset descriptions, accessible labels, and status/error messages. Keep category purposes accurate. Publishing copies all bundled dictionaries; it is not required to use the defaults or to add a custom language.
+
+To add a language the package does not ship, create `lang/vendor/consent/nl/messages.php`, for example:
+
+```php
+<?php
+
+return [
+    'banner_title' => 'Uw privacy telt',
+    'accept_all' => 'Alles accepteren',
+    'reject_optional' => 'Optionele weigeren',
+];
+```
+
+Then set the application locale or `consent.ui.locale` to `nl`, or use `<x-consent::banner locale="nl" />`. These example keys override English; copy the complete structure of a bundled `messages.php` to translate the whole interface. For a regional variant, create a directory such as `nl_BE` and select `nl-BE`. Use the same normalized directory naming for `messages.php` and `services.php`. The built-in layout is left-to-right; custom right-to-left languages also require a published view/layout adaptation and native browser verification.
+
+Service translations follow the same locale chain, then fall back to canonical registry metadata. Built-in preset wording is translated only when its canonical name or description has not been customized. To translate custom services without changing the consent fingerprint, add `lang/vendor/consent/nl/services.php`:
 
 ```php
 return [
     'site-analytics' => [
-        'name' => 'Statystyki strony',
-        'description' => 'Pomiar odwiedzin i sposobu korzystania ze strony.',
+        'name' => 'Statistieken',
+        'description' => 'Bezoeken en het gebruik van de website meten.',
     ],
 ];
 ```
 
-Translations use Laravel's dot lookup; IDs containing dots need corresponding nested translation arrays. A material change of purpose still requires updating canonical service metadata or `policy_version`. If a shared HTML cache serves multiple languages, vary it by the application's locale.
+Translations use Laravel's dot lookup; IDs containing dots need corresponding nested translation arrays. Language and wording changes do not invalidate or extend a saved decision. A material change of purpose still requires updating canonical service metadata or `policy_version`. If a shared HTML cache serves multiple languages, vary it by the locale used to render the interface, including explicit configuration/component overrides.
 
 Add a preferences entry to a footer or privacy page:
 

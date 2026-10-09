@@ -42,10 +42,7 @@ final readonly class BannerSettings
         $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'locale' => null, 'policy_url' => null, 'colors' => [], 'validate_contrast' => false];
         $this->variant = self::variant($configuration['variant']);
         $this->position = self::position($configuration['position']);
-        if ($configuration['locale'] !== null && ! in_array($configuration['locale'], ['en', 'pl'], true)) {
-            throw new InvalidArgumentException('consent.ui.locale must be null, en, or pl.');
-        }
-        $this->locale = $configuration['locale'];
+        $this->locale = $configuration['locale'] === null ? null : self::locale($configuration['locale']);
         $this->policyUrl = self::policyUrl($configuration['policy_url']);
         $warnings = [];
         $this->validateContrast = $configuration['validate_contrast'] === true;
@@ -85,6 +82,27 @@ final readonly class BannerSettings
             }
         }
         $this->colorWarnings = $warnings;
+    }
+
+    public static function locale(mixed $locale): string
+    {
+        if (! is_string($locale) || strlen($locale) > 85 || ! preg_match('/\A[a-zA-Z]{2,8}(?:[-_][a-zA-Z0-9]{1,8})*\z/', $locale)) {
+            throw new InvalidArgumentException('Consent UI locale must be a language tag such as en, fr-CA, or pt_BR.');
+        }
+
+        $parts = explode('-', str_replace('_', '-', $locale));
+        $parts[0] = strtolower($parts[0]);
+        $extension = false;
+        foreach ($parts as $index => $part) {
+            if ($index === 0) {
+                continue;
+            }
+            $extension = $extension || strlen($part) === 1;
+            $parts[$index] = ! $extension && ctype_alpha($part) && strlen($part) === 4 ? ucfirst(strtolower($part))
+                : (! $extension && ctype_alpha($part) && strlen($part) === 2 ? strtoupper($part) : strtolower($part));
+        }
+
+        return implode('-', $parts);
     }
 
     public static function variant(mixed $variant): string

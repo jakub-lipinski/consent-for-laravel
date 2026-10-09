@@ -346,9 +346,10 @@ for (const variant of ['standard', 'compact']) {
 }
 
 for (const variant of ['standard', 'compact']) {
-    for (const locale of ['en', 'pl']) {
+    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt']) {
         test(`axe structural WCAG checks pass for ${variant} ${locale} banner and modal`, async t => {
             const p = await page(t, { input: { locale, ui: { variant } } });
+            assert.equal(p.root.lang, locale);
             p.window.eval(axe.source);
             const options = { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] },
                 rules: { 'color-contrast': { enabled: false }, 'target-size': { enabled: false } } };
@@ -357,6 +358,11 @@ for (const variant of ['standard', 'compact']) {
                 const result = await p.window.axe.run(p.doc, options);
                 assert.deepEqual(plain(result.violations.map(item => ({ id: item.id, nodes: item.nodes.map(node => node.target) }))), []);
             }
+            p.field('analytics').click();
+            p.button('save', true).click();
+            await idle(p);
+            assert.equal(p.api.allowed('analytics'), true);
+            assert.equal(p.root.querySelector('[role="status"]').textContent, p.root.dataset.messageSaved);
         });
     }
 }
