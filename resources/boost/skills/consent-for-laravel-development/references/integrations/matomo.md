@@ -4,6 +4,14 @@
 
 Read when configuring Matomo Cloud/self-hosted tracking, goals, search, links, SPA views, or e-commerce.
 
+## Supported Consent Model
+
+This preset implements tracking with prior analytics consent. SDK loading, initial page views, automatic link tracking, and every `Consent.matomo` measurement helper require a current `analytics` grant. It uses Matomo's `requireConsent`; it does not provide cookie-only consent, a cookieless baseline before consent, or a consent-exempt mode.
+
+Matomo also supports deployments that may qualify for consent exemptions under applicable law, such as restricted audience measurement under France's CNIL conditions. Eligibility depends on the processing purpose, collected data, configuration, and jurisdiction. Disabling cookies or anonymising IP addresses alone does not establish an exemption. Basic page views can require consent, and some restricted events may qualify for an exemption; do not classify solely by the helper name. See [Matomo's consent-free deployment guidance](https://matomo.org/faq/new-to-piwik/how-do-i-use-matomo-analytics-without-consent-or-cookie-banner/) and [CNIL audience-measurement conditions](https://www.cnil.fr/fr/cookies-solutions-pour-les-outils-de-mesure-daudience).
+
+For a separately assessed exempt deployment, keep this preset disabled and configure tracking, privacy information, and any required opt-out in the application. Package `Consent.matomo` helpers require an enabled preset and cannot measure that separate deployment. Matomo Log Analytics is also outside this browser preset. Do not bypass its gate, reclassify analytics as `necessary`, or combine a manual tracker with an enabled preset. Supporting an exempt or hybrid mode inside the package would require a separate implementation; the package does not determine legal eligibility.
+
 ## Configuration
 
 Edit the existing entry inside `consent.presets`:
