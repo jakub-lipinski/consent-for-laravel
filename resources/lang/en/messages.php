@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'Google tags also send cookieless measurement signals before you choose and when optional cookies are denied.',
     'presets' => [
+        'tiktok-pixel' => ['name' => 'TikTok Pixel', 'description' => 'Measure advertising results, interactions, and purchases on this website.'],
         'matomo' => ['name' => 'Matomo', 'description' => 'Measure website visits, interactions, and purchases.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Measure website visits and usage.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Measure advertising conversions and manage advertising consent signals.'],

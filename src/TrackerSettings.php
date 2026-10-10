@@ -6,13 +6,14 @@ use InvalidArgumentException;
 
 final readonly class TrackerSettings
 {
-    public const PRESET_KEYS = ['ga4', 'google_ads', 'meta_pixel', 'clarity', 'matomo'];
+    public const PRESET_KEYS = ['ga4', 'google_ads', 'meta_pixel', 'clarity', 'matomo', 'tiktok_pixel'];
 
     public const SERVICE_DEFAULTS = [
         'meta-pixel' => ['name' => 'Meta Pixel', 'description' => 'Measure advertising results and interactions with this website.'],
         'microsoft-clarity' => ['name' => 'Microsoft Clarity', 'description' => 'Understand website usage through session recordings and heatmaps.'],
         'microsoft-clarity-ads' => ['name' => 'Microsoft Clarity advertising', 'description' => 'Allow advertising-related storage in Microsoft Clarity.'],
         'matomo' => ['name' => 'Matomo', 'description' => 'Measure website visits, interactions, and purchases.'],
+        'tiktok-pixel' => ['name' => 'TikTok Pixel', 'description' => 'Measure advertising results, interactions, and purchases on this website.'],
     ];
 
     /** @var array<string, array<string, mixed>> */
@@ -82,6 +83,11 @@ final readonly class TrackerSettings
         $services += $matomo->services();
         if ($matomo->toArray() !== null) {
             $trackers['matomo'] = $matomo->toArray();
+        }
+        $tiktok = new TikTokSettings(array_key_exists('tiktok_pixel', $presets) ? $presets['tiktok_pixel'] : []);
+        $services += $tiktok->services();
+        if ($tiktok->toArray() !== null) {
+            $trackers['tiktok'] = $tiktok->toArray();
         }
         $this->services = $services;
         $this->trackers = $trackers;

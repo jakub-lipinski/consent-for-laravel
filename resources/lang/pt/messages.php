@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'As etiquetas Google também enviam sinais de medição sem cookies antes de fazer a sua escolha e quando os cookies opcionais são recusados.',
     'presets' => [
+        'tiktok-pixel' => ['name' => 'TikTok Pixel', 'description' => 'Medir os resultados publicitários, as interações e as compras neste site.'],
         'matomo' => ['name' => 'Matomo', 'description' => 'Medir as visitas, as interações e as compras neste site.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Medir as visitas e a utilização do site.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Medir as conversões publicitárias e gerir os sinais de consentimento publicitário.'],

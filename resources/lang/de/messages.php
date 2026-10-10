@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'Google-Tags senden auch Messsignale ohne Cookies, bevor Sie eine Auswahl treffen und wenn optionale Cookies abgelehnt werden.',
     'presets' => [
+        'tiktok-pixel' => ['name' => 'TikTok Pixel', 'description' => 'Werbeergebnisse, Interaktionen und Käufe auf dieser Website messen.'],
         'matomo' => ['name' => 'Matomo', 'description' => 'Besuche, Interaktionen und Käufe auf dieser Website messen.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Besuche und Nutzung der Website messen.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Werbekonversionen messen und Einwilligungssignale für Werbung verwalten.'],

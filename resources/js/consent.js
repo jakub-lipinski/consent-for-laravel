@@ -55,25 +55,30 @@
             throw new Error('Invalid consent audit configuration.');
         }
         const trackers = config.trackers ?? {};
-        if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity', 'matomo'].includes(key))
+        if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity', 'matomo', 'tiktok'].includes(key))
             || Object.hasOwn(trackers, 'meta') && (!trackers.meta || typeof trackers.meta !== 'object' || !/^[1-9][0-9]{0,19}$/.test(trackers.meta.id)
                 || typeof trackers.meta.id !== 'string' || typeof trackers.meta.sendPageView !== 'boolean' || !config.categories.includes('marketing'))
             || Object.hasOwn(trackers, 'clarity') && (!trackers.clarity || typeof trackers.clarity !== 'object' || !/^[a-z0-9]{1,32}$/.test(trackers.clarity.id)
                 || typeof trackers.clarity.id !== 'string' || typeof trackers.clarity.advertising !== 'boolean'
                 || !config.categories.includes('analytics') || trackers.clarity.advertising && !config.categories.includes('marketing'))
-            || Object.hasOwn(trackers, 'matomo') && (!validMatomo(trackers.matomo) || !config.categories.includes('analytics'))) {
+            || Object.hasOwn(trackers, 'matomo') && (!validMatomo(trackers.matomo) || !config.categories.includes('analytics'))
+            || Object.hasOwn(trackers, 'tiktok') && (!trackers.tiktok || typeof trackers.tiktok !== 'object'
+                || typeof trackers.tiktok.id !== 'string' || !/^[A-Z0-9]{20}$/.test(trackers.tiktok.id)
+                || typeof trackers.tiktok.sendPageView !== 'boolean' || !config.categories.includes('marketing'))) {
             throw new Error('Invalid tracker runtime configuration.');
         }
         config.trackers = trackers;
         if (trackers.meta && (window.fbq !== undefined || window._fbq !== undefined)
             || trackers.clarity && window.clarity !== undefined
             || trackers.matomo && (window._paq !== undefined || window.Matomo !== undefined || window.Piwik !== undefined)
+            || trackers.tiktok && (window.ttq !== undefined || window.TiktokAnalyticsObject !== undefined)
             || [...document.scripts].some(script => {
                 if (!script.src) return false;
                 const source = new URL(script.src, document.baseURI);
                 return trackers.meta && source.hostname === 'connect.facebook.net' && source.pathname.endsWith('/fbevents.js')
                     || trackers.clarity && ['www.clarity.ms', 'clarity.ms'].includes(source.hostname) && source.pathname.startsWith('/tag/')
-                    || trackers.matomo && /\/(?:matomo|piwik)\.js$/.test(source.pathname);
+                    || trackers.matomo && /\/(?:matomo|piwik)\.js$/.test(source.pathname)
+                    || trackers.tiktok && source.hostname === 'analytics.tiktok.com' && source.pathname.startsWith('/i18n/pixel/');
             })) {
             throw new Error('Place Consent before tracker libraries and remove duplicate tracker bootstraps.');
         }
@@ -725,6 +730,7 @@
     const trackerFailed = new Set();
     let metaPrevious = null;
     let clarityPrevious = null;
+    let tiktokPrevious = null;
     let matomoTracker = null;
     let matomoPrevious = null;
     let matomoLastPageUrl = null;
@@ -741,20 +747,27 @@
             if (!matomoTracker || typeof matomoTracker[method] !== 'function') throw new Error(`The Matomo ${method} API is unavailable.`);
             return matomoTracker[method](...parameters);
         }
+        if (preset === 'tiktok') {
+            const [method, ...parameters] = args;
+            if (typeof window.ttq?.[method] !== 'function') throw new Error(`The TikTok ${method} API is unavailable.`);
+            return window.ttq[method](...parameters);
+        }
         const command = window[preset === 'meta' ? 'fbq' : 'clarity'];
         if (typeof command !== 'function') throw new Error(`The ${preset} browser API is unavailable.`);
         command(...args);
     }
 
     function updateTrackers() {
-        for (const preset of ['meta', 'clarity']) {
+        for (const preset of ['meta', 'clarity', 'tiktok']) {
             if (!config.trackers[preset]) continue;
-            const signals = preset === 'meta' ? permits(current, 'marketing') ? 'grant' : 'revoke' : claritySignals();
-            const previous = preset === 'meta' ? metaPrevious : clarityPrevious;
+            const signals = preset === 'clarity' ? claritySignals() : permits(current, 'marketing') ? 'grant' : 'revoke';
+            const previous = preset === 'meta' ? metaPrevious : preset === 'tiktok' ? tiktokPrevious : clarityPrevious;
             if (JSON.stringify(signals) === JSON.stringify(previous)) continue;
             try {
-                trackerCommand(preset, preset === 'meta' ? 'consent' : 'consentv2', signals);
+                if (preset === 'tiktok') trackerCommand(preset, signals === 'grant' ? 'grantConsent' : 'revokeConsent');
+                else trackerCommand(preset, preset === 'meta' ? 'consent' : 'consentv2', signals);
                 if (preset === 'meta') metaPrevious = signals;
+                else if (preset === 'tiktok') tiktokPrevious = signals;
                 else {
                     clarityPrevious = signals;
                     if (trackerRecords.get('clarity')?.started && signals.ad_Storage === 'granted') {
@@ -765,7 +778,7 @@
             } catch (error) {
                 trackerFailed.add(preset);
                 report(preset, error);
-                if (trackerRecords.get(preset)?.started && (preset === 'meta' ? signals === 'revoke'
+                if (trackerRecords.get(preset)?.started && (preset !== 'clarity' ? signals === 'revoke'
                     : signals.analytics_Storage === 'denied' || signals.ad_Storage === 'denied' && previous?.ad_Storage === 'granted')) {
                     reload('tracker-consent');
                 }
@@ -811,12 +824,68 @@
         if (settings.cookieDomain !== null) window._paq.push(['setCookieDomain', settings.cookieDomain]);
         if (window.location.protocol === 'https:') window._paq.push(['setSecureCookie', true]);
     }
+    if (config.trackers.tiktok) {
+        const ttq = [];
+        window.TiktokAnalyticsObject = 'ttq';
+        window.ttq = ttq;
+        ttq.methods = ['page', 'track', 'identify', 'instances', 'debug', 'on', 'off', 'once', 'ready', 'alias', 'group',
+            'enableCookie', 'disableCookie', 'holdConsent', 'revokeConsent', 'grantConsent'];
+        ttq.setAndDefer = (queue, method) => { queue[method] = (...args) => queue.push([method, ...args]); };
+        for (const method of ttq.methods) ttq.setAndDefer(ttq, method);
+        ttq._i = {}; ttq._t = {}; ttq._o = {};
+        ttq.instance = id => {
+            const queue = ttq._i[id] ?? [];
+            for (const method of ttq.methods) ttq.setAndDefer(queue, method);
+            return queue;
+        };
+        trackerCommand('tiktok', 'holdConsent');
+        trackerCommand('tiktok', 'revokeConsent');
+        tiktokPrevious = 'revoke';
+    }
     updateTrackers();
 
+    function waitTikTok(record) {
+        // events.js loads another asynchronous script; its own load event does not establish SDK readiness.
+        const retryKey = `consent:script-timeout:${JSON.stringify([denialScope, config.policyVersion, config.servicesVersion, record.id, 'sdk'])}`;
+        return new Promise((resolve, reject) => {
+            let interval, timer, settled = false;
+            const settle = error => {
+                if (settled) return;
+                settled = true; clearInterval(interval); clearTimeout(timer); record.cancels.delete(cancel);
+                if (error) reject(error);
+                else { try { sessionStorage.removeItem(retryKey); } catch {} resolve(); }
+            };
+            const cancel = () => { const error = new Error('Consent was revoked while loading TikTok.'); error.name = 'AbortError'; settle(error); };
+            const check = () => {
+                try {
+                    sync();
+                    if (!canRun('marketing')) { cancel(); return; }
+                    const instance = window.ttq?.instance?.(config.trackers.tiktok.id);
+                    const instances = window.ttq?.instances?.();
+                    if (instance && !Array.isArray(instance) && Array.isArray(instances) && instances.includes(instance)
+                        && typeof instance.track === 'function' && typeof instance.page === 'function') settle();
+                } catch (error) { settle(error); }
+            };
+            record.cancels.add(cancel);
+            interval = setInterval(check, 10);
+            timer = setTimeout(() => {
+                let retry = false;
+                try {
+                    if (sessionStorage.getItem(retryKey) !== '1') {
+                        sessionStorage.setItem(retryKey, '1'); retry = sessionStorage.getItem(retryKey) === '1';
+                    }
+                } catch {}
+                settle(new Error('The TikTok SDK did not initialize before the script deadline.'));
+                reload('script-timeout', retry);
+            }, config.scriptTimeoutMs);
+            check();
+        });
+    }
+
     async function drainTrackers() {
-        for (const preset of ['meta', 'clarity', 'matomo']) {
+        for (const preset of ['meta', 'clarity', 'matomo', 'tiktok']) {
             const settings = config.trackers[preset];
-            const category = preset === 'meta' ? 'marketing' : 'analytics';
+            const category = ['meta', 'tiktok'].includes(preset) ? 'marketing' : 'analytics';
             sync();
             if (!settings || trackerLoaded.has(preset) || trackerFailed.has(preset) || !canRun(category)) continue;
             const record = { id: preset, category, started: false, nodes: [], cancels: new Set(), trackerPreset: true };
@@ -824,12 +893,24 @@
             try {
                 const script = document.createElement('script');
                 script.src = preset === 'meta' ? 'https://connect.facebook.net/en_US/fbevents.js'
-                    : preset === 'clarity' ? `https://www.clarity.ms/tag/${encodeURIComponent(settings.id)}` : `${settings.url}matomo.js`;
+                    : preset === 'clarity' ? `https://www.clarity.ms/tag/${encodeURIComponent(settings.id)}`
+                        : preset === 'matomo' ? `${settings.url}matomo.js`
+                            : `https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=${encodeURIComponent(settings.id)}&lib=ttq`;
+                if (preset === 'tiktok') {
+                    window.ttq._i[settings.id] = [];
+                    window.ttq._i[settings.id]._u = 'https://analytics.tiktok.com/i18n/pixel/events.js';
+                    window.ttq._t[settings.id] = Date.now(); window.ttq._o[settings.id] = {};
+                }
                 if (preset === 'clarity' && claritySignals().ad_Storage === 'granted') {
                     trackerRecords.set('clarity-ads', { id: 'clarity-ads', category: 'marketing',
                         started: true, nodes: [], cancels: new Set(), trackerPreset: true });
                 }
                 if (!await execute(script, record)) continue;
+                if (preset === 'tiktok') {
+                    await waitTikTok(record);
+                    tiktokPrevious = null;
+                    updateTrackers();
+                }
                 sync();
                 if (!canRun(category)) continue;
                 if (preset === 'meta') {
@@ -837,6 +918,7 @@
                     sync();
                     if (settings.sendPageView && canRun(category)) trackerCommand('meta', 'track', 'PageView');
                 }
+                if (preset === 'tiktok' && settings.sendPageView && canRun(category) && !trackerFailed.has(preset)) trackerCommand('tiktok', 'page');
                 if (preset === 'matomo') {
                     matomoTracker = window.Matomo?.getAsyncTracker?.(`${settings.url}matomo.php`, settings.siteId);
                     if (!matomoTracker || typeof matomoTracker.requireConsent !== 'function') throw new Error('The Matomo tracker did not initialize.');
@@ -861,7 +943,7 @@
     }
 
     async function trackerEvent(preset, args) {
-        const category = preset === 'meta' ? 'marketing' : 'analytics';
+        const category = ['meta', 'tiktok'].includes(preset) ? 'marketing' : 'analytics';
         if (!config.trackers[preset]) throw new TypeError(`The ${preset} preset is not enabled.`);
         sync();
         if (!canRun(category)) return false;
@@ -915,6 +997,49 @@
                     if (!config.trackers.clarity) throw new TypeError('The clarity preset is not enabled.');
                     return permitted ? trackerEvent('clarity', ['event', name]) : false;
                 });
+            } catch (error) { return Promise.reject(error); }
+        },
+    });
+
+    function tiktokData(value) {
+        if (!value || Object.prototype.toString.call(value) !== '[object Object]') throw new TypeError('TikTok parameters must be a JSON object.');
+        return JSON.parse(JSON.stringify(value, (key, item) => {
+            if (item === undefined || ['function', 'symbol', 'bigint'].includes(typeof item)
+                || typeof item === 'number' && !Number.isFinite(item)) throw new TypeError('TikTok parameters must contain only JSON values with finite numbers.');
+            return item;
+        }));
+    }
+
+    function tiktokOperation(args) {
+        sync();
+        const permitted = canRun('marketing');
+        return eventOperation(() => {
+            if (!config.trackers.tiktok) throw new TypeError('The tiktok preset is not enabled.');
+            return permitted ? trackerEvent('tiktok', args) : false;
+        });
+    }
+
+    function tiktokTrack(name, parameters, options) {
+        try {
+            if (typeof name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{0,49}$/.test(name)) throw new TypeError('TikTok event names must start with a letter and contain at most 50 letters, digits, or underscores.');
+            const data = tiktokData(parameters);
+            if (!options || Object.prototype.toString.call(options) !== '[object Object]' || Object.keys(options).some(key => key !== 'eventID')
+                || Object.hasOwn(options, 'eventID') && (typeof options.eventID !== 'string' || !options.eventID.trim()
+                    || options.eventID.length > 128 || /[\x00-\x1f\x7f]/.test(options.eventID))) throw new TypeError('TikTok options accept only an eventID string of 1-128 characters.');
+            return tiktokOperation(['track', name, data, { pixel_code: config.trackers.tiktok?.id, ...(Object.hasOwn(options, 'eventID') ? { event_id: options.eventID } : {}) }]);
+        } catch (error) { return Promise.reject(error); }
+    }
+
+    const tiktokApi = Object.freeze({
+        track: (name, parameters = {}, options = {}) => tiktokTrack(name, parameters, options),
+        trackCustom: (name, parameters = {}, options = {}) => tiktokTrack(name, parameters, options),
+        pageView: () => { try { return tiktokOperation(['page']); } catch (error) { return Promise.reject(error); } },
+        identify: identity => {
+            try {
+                const data = tiktokData(identity);
+                if (!Object.keys(data).length || Object.entries(data).some(([key, value]) => !['sha256_email', 'sha256_phone_number', 'external_id'].includes(key)
+                    || typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value))) throw new TypeError('TikTok identify requires lowercase SHA-256 values for sha256_email, sha256_phone_number, or external_id.');
+                return tiktokOperation(['identify', data]);
             } catch (error) { return Promise.reject(error); }
         },
     });
@@ -1054,6 +1179,7 @@
         meta: metaApi,
         clarity: clarityApi,
         matomo: matomoApi,
+        tiktok: tiktokApi,
         state: () => snapshot(sync()),
         allowed: category => { checkCategory(category); sync(); return category === 'necessary' || canRun(category); },
         choose,

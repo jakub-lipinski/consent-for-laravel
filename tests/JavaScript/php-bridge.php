@@ -26,6 +26,6 @@ $request = Request::create('/', cookies: ['consent_preferences' => $input['cooki
 
 echo json_encode([
     'config' => $app->make(BrowserRuntime::class)->configuration(),
-    'decision' => $manager->choose(['analytics' => true])->toArray(),
+    'decision' => $manager->choose($input['choices'] ?? ['analytics' => true])->toArray(),
     'restored' => $manager->read($request)->toArray(),
 ], JSON_THROW_ON_ERROR);

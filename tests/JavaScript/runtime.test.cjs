@@ -1596,3 +1596,253 @@ test('Matomo preserves preset ordering alongside Google, Meta, Clarity, and cust
     assert.equal(await p.api.clarity.event('login'), true);
     assert.equal(await p.api.matomo.event('Account', 'Login'), true);
 });
+
+const tiktokConfig = overrides => ({ id: 'C1234567890ABCDEFGHI', sendPageView: true, ...overrides });
+const tiktokFixture = `
+window.tiktokCommands = ttq.map(args => Array.from(args));
+window.tiktokTarget = { ids: Object.keys(ttq._i), options: ttq._o, urls: Object.values(ttq._i).map(queue => queue._u) };
+window.tiktokInstance = { page() {}, track() {} };
+window.ttq = Object.fromEntries(['page','track','identify','holdConsent','revokeConsent','grantConsent'].map(method => [method, (...args) => {
+    tiktokCommands.push([method,...args]); if (method === 'page') order.push('tiktok-page');
+}]));
+ttq.instance = id => id === 'C1234567890ABCDEFGHI' ? tiktokInstance : null;
+ttq.instances = () => [tiktokInstance];
+`;
+const tiktokFiles = { '/i18n/pixel/events.js': tiktokFixture };
+const tiktokCommands = p => plain(p.window.tiktokCommands);
+const tiktokCalls = api => [api.track('Purchase', { value: 10, currency: 'PLN' }), api.trackCustom('Login'), api.pageView(), api.identify({ external_id: 'a'.repeat(64) })];
+const tiktokServices = [{ id: 'tiktok-pixel', category: 'marketing', cookies: [
+    ...['_ttp', 'ttclid', 'ttcsid', '_tt_enable_cookie'].map(name => ({ name, prefix: null, path: '/', domain: null })),
+    { name: null, prefix: 'ttcsid_', path: '/', domain: null },
+] }];
+
+test('TikTok remains inert when pending, refused, or granted only analytics and never replays denied measurements', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles });
+    assert(Object.isFrozen(p.api.tiktok)); assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(await Promise.all(tiktokCalls(p.api.tiktok)), Array(4).fill(false));
+    await p.api.rejectOptional(); await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+    assert.equal(tiktokCommands(p).some(args => ['track', 'identify'].includes(args[0])), false);
+});
+
+test('TikTok owns one scoped pixel and initializes once before custom scripts with the inherited nonce', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles,
+        html: block('custom', 'marketing', inline('order.push("custom")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(tiktokCommands(p).slice(0, 2), [['holdConsent'], ['revokeConsent']]);
+    const commands = tiktokCommands(p);
+    assert(commands.findIndex(args => args[0] === 'grantConsent') < commands.findIndex(args => args[0] === 'page'));
+    assert.deepEqual(plain(p.window.tiktokTarget), { ids: ['C1234567890ABCDEFGHI'], options: { C1234567890ABCDEFGHI: {} }, urls: ['https://analytics.tiktok.com/i18n/pixel/events.js'] });
+    const script = p.window.document.querySelector('script[src*="analytics.tiktok.com"]');
+    assert.equal(script.nonce, 'fixture-nonce'); assert.equal(new URL(script.src).searchParams.get('sdkid'), 'C1234567890ABCDEFGHI');
+    assert.deepEqual(plain(p.window.order), ['tiktok-page', 'custom']);
+    await p.api.acceptAll(); p.window.document.body.insertAdjacentHTML('beforeend', block('later', 'marketing', inline('order.push("later")')));
+    await delay(10); await p.api.whenIdle(); assert.equal(p.loader.requests.length, 1);
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+});
+
+test('TikTok restored grants load while disabled automatic page views leave tracking to the application', async t => {
+    const config = configuration({ trackers: { tiktok: tiktokConfig({ sendPageView: false }) } });
+    const p = await page(t, { config, state: decision(config, { marketing: true }), files: tiktokFiles });
+    assert.equal(tiktokCommands(p).some(args => args[0] === 'page'), false);
+    p.window.history.pushState({}, '', '/checkout');
+    assert.equal(await p.api.tiktok.pageView(), true);
+    assert.equal(tiktokCommands(p).at(-1)[0], 'page');
+});
+
+test('TikTok captures commerce payloads, routes event IDs, and sends custom events and explicit hashed identity in order', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig({ sendPageView: false }) } }, files: tiktokFiles });
+    await p.api.choose({ marketing: true });
+    const payload = { contents: [{ content_id: 'sku-1', quantity: 2, price: 10 }], value: 20, currency: 'PLN' };
+    const options = { eventID: 'order-42' };
+    const purchase = p.api.tiktok.track('Purchase', payload, options);
+    payload.contents[0].content_id = 'mutated'; options.eventID = 'mutated';
+    assert.equal(await purchase, true);
+    assert.deepEqual(tiktokCommands(p).at(-1), ['track', 'Purchase', { contents: [{ content_id: 'sku-1', quantity: 2, price: 10 }], value: 20, currency: 'PLN' }, { pixel_code: 'C1234567890ABCDEFGHI', event_id: 'order-42' }]);
+    assert.equal(await p.api.tiktok.trackCustom('Login', { method: 'password' }), true);
+    assert.deepEqual(tiktokCommands(p).at(-1), ['track', 'Login', { method: 'password' }, { pixel_code: 'C1234567890ABCDEFGHI' }]);
+    const identity = { sha256_email: 'a'.repeat(64), sha256_phone_number: 'b'.repeat(64), external_id: 'c'.repeat(64) };
+    const identified = p.api.tiktok.identify(identity); identity.external_id = 'd'.repeat(64);
+    assert.equal(await identified, true);
+    assert.deepEqual(tiktokCommands(p).at(-1), ['identify', { sha256_email: 'a'.repeat(64), sha256_phone_number: 'b'.repeat(64), external_id: 'c'.repeat(64) }]);
+    assert.equal(p.api.allowed('analytics'), false);
+});
+
+test('TikTok waits for the second SDK script before measurements and custom blocks', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: {
+        '/i18n/pixel/events.js': 'const script=document.createElement("script");script.src="/tiktok-main.js";document.head.append(script);',
+        '/tiktok-main.js': { body: tiktokFixture, delay: 40 },
+    }, html: block('custom', 'marketing', inline('order.push("custom")')) });
+    await p.api.acceptAll();
+    const event = p.api.tiktok.track('Purchase'); await delay(10);
+    assert.equal(p.window.tiktokCommands, undefined); assert.deepEqual(plain(p.window.order), []);
+    assert.equal(await event, true); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['tiktok-page', 'custom']);
+});
+
+for (const phase of ['bootstrap', 'runtime']) {
+    test(`TikTok pending ${phase} loading cannot delay withdrawal or replay an event`, async t => {
+        const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() }, scriptTimeoutMs: 300 }, files: {
+            '/i18n/pixel/events.js': phase === 'bootstrap' ? { body: tiktokFixture, delay: 150 } : 'window.bootstrapLoaded=true;',
+        } });
+        await p.api.acceptAll(); const event = p.api.tiktok.track('Purchase');
+        for (let i = 0; p.loader.requests.length === 0 && i < 100; i++) await delay(1);
+        if (phase === 'runtime') { for (let i = 0; !p.window.bootstrapLoaded && i < 100; i++) await delay(1); }
+        const refused = await Promise.race([p.api.rejectOptional(), delay(80).then(() => null)]);
+        assert(refused); assert.equal(await event, false); await p.api.whenIdle();
+        assert.equal(p.reloads.length, 1); assert.equal(p.window.tiktokCommands, undefined);
+    });
+}
+
+test('TikTok synchronous withdrawal precedes listeners, cleans cookies, protects audit/session cookies, and forces reload', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() }, services: tiktokServices,
+        protectedCookies: [...configuration().protectedCookies, 'consent_preferences_audit'] }, files: tiktokFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    for (const name of ['_ttp', 'ttclid', 'ttcsid', '_tt_enable_cookie', 'ttcsid_C1234567890ABCDEFGHI', 'consent_preferences_audit', 'app_session', 'XSRF-TOKEN']) p.window.document.cookie = `${name}=keep; Path=/`;
+    p.api.onRevoke('marketing', () => {}, { reload: false });
+    let observed; p.api.onChange(() => { observed = tiktokCommands(p).at(-1); });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(observed, ['revokeConsent']); assert.equal(p.reloads.length, 1);
+    assert.equal(await p.api.tiktok.track('Purchase'), false);
+    for (const name of ['_ttp', 'ttclid', 'ttcsid', '_tt_enable_cookie', 'ttcsid_C1234567890ABCDEFGHI']) assert.equal(p.window.document.cookie.includes(`${name}=`), false);
+    for (const name of ['consent_preferences_audit', 'app_session', 'XSRF-TOKEN']) assert(p.window.document.cookie.includes(`${name}=`));
+});
+
+for (const transition of ['expiry', 'external', 'forget']) {
+    test(`TikTok ${transition} invalidation signals denial and reloads`, async t => {
+        const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles });
+        await p.api.acceptAll(); await p.api.whenIdle();
+        if (transition === 'forget') await p.api.forget();
+        else { store(p.jar, transition === 'expiry' ? decision(p.config, { marketing: true }, { decidedAt: 1, expiresAt: 2 }) : decision(p.config, {})); await p.api.refresh(); }
+        await p.api.whenIdle(); assert.equal(p.api.allowed('marketing'), false);
+        assert.deepEqual(tiktokCommands(p).at(-1), ['revokeConsent']); assert.equal(p.reloads.length, 1);
+    });
+}
+
+test('TikTok dispatch rechecks consent behind earlier events and queued acceptance never revives denied calls', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig({ sendPageView: false }) } }, files: tiktokFiles });
+    const grant = p.api.acceptAll(); const denied = Promise.all(tiktokCalls(p.api.tiktok)); await grant;
+    assert.deepEqual(await denied, Array(4).fill(false)); await p.api.whenIdle();
+    const original = p.window.ttq.track;
+    p.window.ttq.track = (...args) => { original(...args); store(p.jar, decision(p.config, {})); };
+    const first = p.api.tiktok.track('AddToCart'); const second = p.api.tiktok.track('Purchase');
+    assert.equal(await first, true); assert.equal(await second, false); await p.api.whenIdle();
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'track').length, 1);
+});
+
+test('TikTok SDK failures remain isolated and consent signal failures preserve denial', async t => {
+    const failed = await page(t, { config: { trackers: { tiktok: tiktokConfig(), matomo: matomoConfig() } },
+        files: { ...matomoFiles, '/i18n/pixel/events.js': new Error('offline') }, html: block('custom', 'marketing', inline('order.push("custom")')) });
+    await failed.api.acceptAll(); await failed.api.whenIdle(); assert.equal(await failed.api.tiktok.track('Purchase'), false);
+    assert.equal(await failed.api.matomo.event('Account', 'Login'), true); assert(failed.window.order.includes('custom'));
+    assert.equal(failed.errors.filter(e => e.code === 'tiktok').length, 1);
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles });
+    await p.api.acceptAll(); await p.api.whenIdle(); p.window.ttq.revokeConsent = () => { throw new Error('signal failed'); };
+    await p.api.rejectOptional(); await p.api.whenIdle(); assert.equal(p.api.allowed('marketing'), false); assert.equal(p.reloads.length, 1);
+});
+
+for (const phase of ['bootstrap', 'runtime']) {
+    test(`TikTok ${phase} timeouts use bounded reload recovery and stop activation`, async t => {
+        const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() }, scriptTimeoutMs: 20 },
+            files: { '/i18n/pixel/events.js': phase === 'bootstrap' ? 'hang' : 'window.bootstrapLoaded=true;' },
+            html: block('custom', 'marketing', inline('order.push("custom")')) });
+        await p.api.acceptAll(); await p.api.whenIdle(); assert.deepEqual(p.reloads, [{ reason: 'script-timeout' }]);
+        assert.deepEqual(plain(p.window.order), []); assert.equal(await p.api.tiktok.pageView(), false);
+        const session = [...Array(p.window.sessionStorage.length)].map((_,i) => [p.window.sessionStorage.key(i), p.window.sessionStorage.getItem(p.window.sessionStorage.key(i))]);
+        const next = await page(t, { config: p.config, state: p.api.state(), files: { '/i18n/pixel/events.js': phase === 'bootstrap' ? 'hang' : 'window.bootstrapLoaded=true;' },
+            before: window => session.forEach(([key, value]) => window.sessionStorage.setItem(key, value)) });
+        assert.deepEqual(next.reloads, [{ reason: 'script-timeout', automatic: false }]);
+    });
+}
+
+test('TikTok is gated in Google Advanced and preserves ordering alongside all existing presets', async t => {
+    const p = await page(t, { config: { google: googleConfig('advanced'), trackers: { ...trackerConfig(), matomo: matomoConfig(), tiktok: tiktokConfig() } },
+        files: { ...googleFiles, ...trackerFiles, ...matomoFiles, ...tiktokFiles }, html: block('custom', 'marketing', inline('order.push("custom")')) });
+    assert.deepEqual(p.loader.requests, ['/gtag/js']); await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.equal(p.loader.requests.includes('/i18n/pixel/events.js'), false);
+    await p.api.acceptAll(); await p.api.whenIdle(); assert.deepEqual(p.loader.requests, ['/gtag/js', '/tag/abc123def4', '/analytics/matomo.js', '/en_US/fbevents.js', '/i18n/pixel/events.js']);
+    assert.deepEqual(plain(p.window.order), ['matomo-page', 'tiktok-page', 'custom']);
+    assert.equal(await p.api.google.event('G-ABCD1234', 'purchase'), true);
+    assert.equal(await p.api.meta.track('Purchase'), true); assert.equal(await p.api.clarity.event('checkout'), true);
+    assert.equal(await p.api.matomo.goal(1), true); assert.equal(await p.api.tiktok.track('Purchase'), true);
+});
+
+for (const global of ['ttq', 'TiktokAnalyticsObject']) {
+    test(`TikTok detects an existing ${global} installation before optional activation`, async t => {
+        const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, before: window => { window[global] = {}; } });
+        assert.equal(p.api, undefined); assert(p.errors.some(e => e.code === 'configuration')); assert.deepEqual(p.loader.requests, []);
+    });
+}
+
+test('TikTok rejects duplicate scripts, malformed runtime settings, and invalid API payloads', async t => {
+    const duplicate = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, head: '<script type="application/json" src="https://analytics.tiktok.com/i18n/pixel/events.js"></script>' });
+    assert.equal(duplicate.api, undefined);
+    for (const config of [tiktokConfig({ id: 'bad' }), tiktokConfig({ sendPageView: 'true' }), null]) {
+        const p = await page(t, { config: { trackers: { tiktok: config } } }); assert.equal(p.api, undefined);
+    }
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles });
+    const circular = {}; circular.self = circular;
+    const invalid = [() => p.api.tiktok.track(''), () => p.api.tiktok.track('9event'), () => p.api.tiktok.track('a'.repeat(51)),
+        () => p.api.tiktok.track('Purchase', null), () => p.api.tiktok.track('Purchase', { value: NaN }),
+        () => p.api.tiktok.track('Purchase', { value: undefined }), () => p.api.tiktok.track('Purchase', { fn() {} }),
+        () => p.api.tiktok.track('Purchase', circular), () => p.api.tiktok.track('Purchase', {}, { eventID: '' }),
+        () => p.api.tiktok.track('Purchase', {}, { eventID: 'line\nbreak' }), () => p.api.tiktok.track('Purchase', {}, { pixel_code: 'other' }),
+        () => p.api.tiktok.identify({}), () => p.api.tiktok.identify({ email: 'plain@example.test' }),
+        () => p.api.tiktok.identify({ external_id: 'not-a-hash' }), () => p.api.tiktok.identify({ sha256_email: 'A'.repeat(64) })];
+    for (const call of invalid) await assert.rejects(call(), error => error.name === 'TypeError');
+    assert.deepEqual(p.loader.requests, []);
+    const disabled = await page(t); await assert.rejects(disabled.api.tiktok.track('Purchase'), /not enabled/);
+});
+
+test('TikTok audit grants wait for a durable receipt and failed audits never enable the Pixel', async t => {
+    let acknowledge; const requests = [];
+    const p = await page(t, { config: { audit: auditConfig, trackers: { tiktok: tiktokConfig() } }, html: auditNoticeHtml, files: tiktokFiles,
+        before: window => { window.fetch = (url, options) => { requests.push(JSON.parse(options.body)); return new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); }; } });
+    const grant = p.api.acceptAll(); await delay(1); assert.equal(p.api.allowed('marketing'), false); assert.deepEqual(p.loader.requests, []);
+    assert.equal(await p.api.tiktok.track('Purchase'), false); acknowledge(); await grant; await p.api.whenIdle();
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1); assert.equal(requests[0].choices.marketing, true);
+    const failure = await page(t, { config: { audit: auditConfig, trackers: { tiktok: tiktokConfig() } }, html: auditNoticeHtml, files: tiktokFiles,
+        before: window => { window.fetch = async (url, options) => auditReceipt(options, 503); } });
+    await assert.rejects(failure.api.acceptAll(), /503/); assert.equal(failure.api.allowed('marketing'), false); assert.deepEqual(failure.loader.requests, []);
+});
+
+test('TikTok audit withdrawal denies immediately while receipts fail and delayed receipts cannot revive it', async t => {
+    let stalled = false;
+    const p = await page(t, { config: { audit: auditConfig, trackers: { tiktok: tiktokConfig() } }, html: auditNoticeHtml, files: tiktokFiles,
+        before: window => { window.fetch = (url, options) => stalled ? new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('deadline')))) : Promise.resolve(auditReceipt(options)); } });
+    await p.api.acceptAll(); await p.api.whenIdle(); stalled = true;
+    const refused = p.api.rejectOptional(); const rejection = assert.rejects(refused, /deadline/);
+    assert.equal(p.api.allowed('marketing'), false); assert.deepEqual(tiktokCommands(p).at(-1), ['revokeConsent']);
+    assert.equal(await p.api.tiktok.track('Purchase'), false); await rejection; await p.api.whenIdle(); assert.equal(p.reloads.length, 1);
+    const held = [];
+    const race = await page(t, { config: { audit: auditConfig, trackers: { tiktok: tiktokConfig() } }, html: auditNoticeHtml, files: tiktokFiles,
+        before: window => { window.fetch = (url, options) => new Promise(resolve => held.push(() => resolve(auditReceipt(options)))); } });
+    const grant = race.api.acceptAll(); const later = race.api.rejectOptional(); held[1](); held[0]();
+    await Promise.all([grant, later]); await race.api.whenIdle(); assert.deepEqual(race.loader.requests, []);
+});
+
+test('PHP TikTok configuration and restored marketing permission work in the browser', async t => {
+    const bridge = phpBridge({ presets: { tiktok_pixel: { enabled: true, pixel_id: 'C1234567890ABCDEFGHI' } }, choices: { marketing: true } });
+    const p = await page(t, { config: bridge.config, state: bridge.decision, files: tiktokFiles });
+    assert.equal(p.api.allowed('marketing'), true); assert.equal(await p.api.tiktok.track('Purchase'), true);
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+});
+
+test('TikTok rechecks a changed decision after its initialized grant before the first page view', async t => {
+    const refusal = `document.cookie = 'consent_preferences=${encodeURIComponent(JSON.stringify(decision(configuration(), {})))}; Path=/';`;
+    const fixture = tiktokFixture + `const grant = ttq.grantConsent; ttq.grantConsent = () => { grant(); ${refusal} };`;
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: { '/i18n/pixel/events.js': fixture } });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.equal(tiktokCommands(p).some(args => args[0] === 'page'), false);
+    assert.equal(p.api.allowed('marketing'), false); assert.equal(p.reloads.length, 1);
+});
+
+test('TikTok provider event exceptions reject without poisoning subsequent helpers', async t => {
+    const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() } }, files: tiktokFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    const track = p.window.ttq.track; p.window.ttq.track = () => { throw new Error('provider failure'); };
+    await assert.rejects(p.api.tiktok.track('Purchase'), /provider failure/); p.window.ttq.track = track;
+    assert.equal(await p.api.tiktok.trackCustom('CheckoutRecovered'), true);
+});

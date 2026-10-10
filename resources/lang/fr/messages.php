@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'Les balises Google envoient également des signaux de mesure sans cookies avant votre choix et lorsque les cookies facultatifs sont refusés.',
     'presets' => [
+        'tiktok-pixel' => ['name' => 'TikTok Pixel', 'description' => 'Mesurer les résultats publicitaires, les interactions et les achats sur ce site.'],
         'matomo' => ['name' => 'Matomo', 'description' => 'Mesurer les visites, les interactions et les achats sur ce site.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Mesurer les visites et l’utilisation du site.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Mesurer les conversions publicitaires et gérer les signaux de consentement publicitaire.'],

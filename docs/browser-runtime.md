@@ -37,7 +37,7 @@ All methods are on `window.Consent`. Optional categories must be registered befo
 
 Decision promises resolve after persistence and cleanup, independently of loading newly allowed scripts. Use `whenIdle()` when testing or when you need to wait for those scripts. It does not await asynchronous tasks spawned by application callbacks or vendor code.
 
-Preset event helpers have their own ordered queue. They await preset initialization, independently of custom script completion, and recheck consent before dispatch. A pending event never blocks saving a decision or withdrawing consent. Modules inside `@consent` may await the Google, Meta, Clarity, and Matomo event helpers; do not await `whenIdle()` inside a gated module, because it includes that module's own completion.
+Preset event helpers have their own ordered queue. They await preset initialization, independently of custom script completion, and recheck consent before dispatch. A pending event never blocks saving a decision or withdrawing consent. Modules inside `@consent` may await the Google, Meta, Clarity, Matomo, and TikTok event helpers; do not await `whenIdle()` inside a gated module, because it includes that module's own completion.
 
 ```js
 try {
@@ -150,3 +150,9 @@ Meta needs marketing. Clarity needs analytics; ad storage also needs explicitly 
 The Matomo preset loads after eligible Meta/Clarity presets and before custom Blade blocks. It requires analytics permission in every Google mode. The default configuration sends one initial page view and enables automatic outlink/download tracking; `send_page_view` and `enable_link_tracking` can disable these separately.
 
 `Consent.matomo.event`, `pageView`, `goal`, `search`, `link`, `ecommerceCart`, and `ecommerceOrder` all check permission at invocation and before dispatch. Multi-command page views and commerce operations recheck before each command, and commerce items are cleared between operations. Active withdrawal sends Matomo's denial signal, disables automatic link/heartbeat tracking, deletes declared cookies, and requires reload. See the [Matomo guide](matomo.md) for configuration, API signatures, examples, and failure behavior.
+
+## TikTok Pixel
+
+TikTok requires marketing permission in every Google mode and loads after Matomo, before custom Blade blocks. The loader waits for both the bootstrap and the Pixel runtime. By default it sends one initial page view; `send_page_view: false` leaves page views to the application.
+
+`Consent.tiktok.track`, `trackCustom`, `pageView`, and `identify` check permission at invocation and dispatch. Event options can include `eventID`; matching accepts only explicitly supplied SHA-256 hashes. Calls without permission are discarded. Active withdrawal sends `revokeConsent` before change listeners, expires declared first-party cookies, and requires reload. See the [TikTok guide](tiktok.md) for examples, account settings, CSP, and failure behavior.

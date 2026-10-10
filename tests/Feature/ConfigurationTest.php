@@ -5,6 +5,7 @@ use ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider;
 use ConsentForLaravel\ConsentForLaravel\ConsentSettings;
 use ConsentForLaravel\ConsentForLaravel\MatomoSettings;
 use ConsentForLaravel\ConsentForLaravel\ServiceRegistry;
+use ConsentForLaravel\ConsentForLaravel\TikTokSettings;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 
 it('validates consent settings', function (mixed $configuration) {
@@ -117,6 +118,7 @@ it('caches custom service and cookie configuration without closures or objects',
         'send_page_view' => false, 'enable_link_tracking' => true,
         'cookie_path' => '/shop', 'cookie_domain' => '.example.test',
     ];
+    $configuration['presets']['tiktok_pixel'] = ['enabled' => true, 'pixel_id' => 'C1234567890ABCDEFGHI', 'send_page_view' => false];
     $configPath = config_path('consent.php');
     $cachePath = $this->app->getCachedConfigPath();
     file_put_contents($configPath, '<?php return '.var_export($configuration, true).';');
@@ -137,7 +139,7 @@ it('caches custom service and cookie configuration without closures or objects',
             ->and((new MatomoSettings($cached['presets']['matomo']))->toArray())->toBe([
                 'url' => 'https://stats.example.test/analytics/', 'siteId' => '3', 'sendPageView' => false,
                 'enableLinkTracking' => true, 'cookiePath' => '/shop', 'cookieDomain' => '.example.test',
-            ]);
+            ])->and((new TikTokSettings($cached['presets']['tiktok_pixel']))->toArray())->toBe(['id' => 'C1234567890ABCDEFGHI', 'sendPageView' => false]);
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);
         unlink($configPath);

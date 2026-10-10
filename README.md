@@ -14,7 +14,7 @@ PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required 
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
 - Optional database audit history with signed copies of the rendered banner and preferences dialog.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
-- GA4, Google Ads, Meta Pixel, Microsoft Clarity, and Matomo presets, including Google Consent Mode v2.
+- GA4, Google Ads, Meta Pixel, Microsoft Clarity, Matomo, and TikTok Pixel presets, including Google Consent Mode v2.
 - Consent withdrawal with declared cookie cleanup and a default reload when optional code is already running.
 - Keyboard interaction, native modal semantics, responsive layouts, and optional non-blocking contrast diagnostics.
 
@@ -79,9 +79,11 @@ For other presets or your own scripts, follow [the complete quick start](https:/
 | `clarity` | `CONSENT_CLARITY_ID` | Analytics; advertising also requires explicit enablement and marketing |
 | `matomo` | `CONSENT_MATOMO_URL`, `CONSENT_MATOMO_SITE_ID` | Analytics |
 
-Google Advanced is an explicit opt-in that allows tags and cookieless pings before permission. Meta, Clarity, and Matomo remain strictly gated. Read the [integration guides](https://consent.lipinskijakub.pl/docs/integrations) and [Matomo guide](docs/matomo.md) for account settings, events, CSP, cookie scopes, and withdrawal.
+Google Advanced is an explicit opt-in that allows tags and cookieless pings before permission. Meta, Clarity, Matomo, and TikTok remain strictly gated. Read the [integration guides](https://consent.lipinskijakub.pl/docs/integrations), [Matomo guide](docs/matomo.md), and [TikTok guide](docs/tiktok.md) for account settings, events, CSP, cookie scopes, and withdrawal.
 
 Matomo supports Cloud and self-hosted instances. Enabling its preset automatically measures the first page view, outlinks, and downloads after analytics consent. `Consent.matomo` also provides guarded events, goals, searches, SPA page views, and e-commerce cart/order measurements. See the [complete configuration and examples](docs/matomo.md).
+
+TikTok Pixel sends an initial page view after marketing consent. `Consent.tiktok` adds guarded standard/custom events, manual SPA page views, event IDs, and optional Advanced Matching with SHA-256 hashes. See the [configuration and examples](docs/tiktok.md).
 
 ## Your own scripts
 

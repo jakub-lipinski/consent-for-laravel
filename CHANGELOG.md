@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a disabled-by-default TikTok Pixel preset with strict marketing consent, an initial page view, seven translated purposes, and first-party cookie cleanup.
+- Add guarded TikTok standard/custom events, manual SPA page views, event IDs, and optional hash-based Advanced Matching. Wait for the two-stage SDK, discard denied measurements, and require reload after active withdrawal. See the [TikTok guide](docs/tiktok.md).
 - Add a disabled-by-default Matomo preset for Cloud and self-hosted instances, with strict analytics consent, automatic page views/outlinks/downloads, seven translated purpose descriptions, and site-specific cookie cleanup.
 - Add guarded Matomo helpers for events, goals, searches, links, SPA page views, and e-commerce carts/orders. Denied events are discarded; active withdrawal signals denial before listeners and requires reload.
 - Validate and fingerprint Matomo destinations, options, purposes, and cookie scopes without changing existing decisions when the preset is disabled. See the [Matomo guide](docs/matomo.md).

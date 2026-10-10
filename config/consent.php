@@ -226,6 +226,15 @@ return [
             'cookie_path' => '/',
             'cookie_domain' => null,
         ],
+
+        'tiktok_pixel' => [
+            'enabled' => false,
+            'pixel_id' => env('CONSENT_TIKTOK_PIXEL_ID'),
+            'send_page_view' => true,
+            // Cleanup scope: match the actual cookies set by your Pixel settings.
+            'cookie_path' => '/',
+            'cookie_domain' => null,
+        ],
     ],
 
     /*
