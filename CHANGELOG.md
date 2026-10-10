@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add discoverable Laravel Boost guidelines and a `consent-for-laravel-development` skill with twelve focused references covering setup, interface, scripts, browser/PHP APIs, auditing, all built-in integrations, and verification. See the [Boost guide](docs/boost.md).
 - Add a disabled-by-default TikTok Pixel preset with strict marketing consent, an initial page view, seven translated purposes, and first-party cookie cleanup.
 - Add guarded TikTok standard/custom events, manual SPA page views, event IDs, and optional hash-based Advanced Matching. Wait for the two-stage SDK, discard denied measurements, and require reload after active withdrawal. See the [TikTok guide](docs/tiktok.md).
 - Add a disabled-by-default Matomo preset for Cloud and self-hosted instances, with strict analytics consent, automatic page views/outlinks/downloads, seven translated purpose descriptions, and site-specific cookie cleanup.

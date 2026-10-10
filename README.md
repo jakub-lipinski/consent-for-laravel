@@ -15,6 +15,7 @@ PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required 
 - Optional database audit history with signed copies of the rendered banner and preferences dialog.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
 - GA4, Google Ads, Meta Pixel, Microsoft Clarity, Matomo, and TikTok Pixel presets, including Google Consent Mode v2.
+- Laravel Boost guidelines and a development skill with focused configuration, integration, and verification references.
 - Consent withdrawal with declared cookie cleanup and a default reload when optional code is already running.
 - Keyboard interaction, native modal semantics, responsive layouts, and optional non-blocking contrast diagnostics.
 
@@ -78,6 +79,7 @@ For other presets or your own scripts, follow [the complete quick start](https:/
 | `meta_pixel` | `CONSENT_META_PIXEL_ID` | Marketing |
 | `clarity` | `CONSENT_CLARITY_ID` | Analytics; advertising also requires explicit enablement and marketing |
 | `matomo` | `CONSENT_MATOMO_URL`, `CONSENT_MATOMO_SITE_ID` | Analytics |
+| `tiktok_pixel` | `CONSENT_TIKTOK_PIXEL_ID` | Marketing |
 
 Google Advanced is an explicit opt-in that allows tags and cookieless pings before permission. Meta, Clarity, Matomo, and TikTok remain strictly gated. Read the [integration guides](https://consent.lipinskijakub.pl/docs/integrations), [Matomo guide](docs/matomo.md), and [TikTok guide](docs/tiktok.md) for account settings, events, CSP, cookie scopes, and withdrawal.
 
@@ -127,6 +129,10 @@ Existing configs retain the light default; presentation changes preserve saved c
 Enable `audit.enabled` after publishing and running the optional `consent-audit-migrations` migration. Explicit acceptance, refusal, preference changes, and withdrawal are stored with server timestamps and an immutable snapshot of the rendered banner/dialog, including custom wording and translations. The default remains disabled.
 
 New optional grants wait for a database receipt; refusal and withdrawal take effect locally immediately. Audit retention is separately configurable. See the [audit log guide](docs/audit-log.md) for installation, pruning, identity, caching, and failure behavior, and [v1.3.0 upgrade notes](docs/releases/v1.3.0.md#upgrade) when using published views or assets.
+
+## Laravel Boost
+
+The package includes discoverable guidelines and the `consent-for-laravel-development` skill. In your application, run `php artisan boost:install`, select this package, and enable guidelines and skills for your agents. Existing Boost installations can add it through `php artisan boost:update --discover`. See the [Boost guide](docs/boost.md) for installation, generated files, reference contents, and custom overrides. Boost is optional and is not a package runtime dependency.
 
 ## Documentation and updates
 
