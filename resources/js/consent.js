@@ -15,6 +15,21 @@
         return;
     }
 
+    function validMatomo(settings) {
+        if (!settings || typeof settings !== 'object' || Array.isArray(settings)
+            || typeof settings.url !== 'string' || settings.url.length > 2048
+            || typeof settings.siteId !== 'string' || !/^[1-9][0-9]{0,9}$/.test(settings.siteId) || Number(settings.siteId) > 2147483647
+            || typeof settings.sendPageView !== 'boolean' || typeof settings.enableLinkTracking !== 'boolean'
+            || typeof settings.cookiePath !== 'string' || !settings.cookiePath.startsWith('/') || /[;\x00-\x20\x7f]/.test(settings.cookiePath)
+            || settings.cookieDomain !== null && (typeof settings.cookieDomain !== 'string' || settings.cookieDomain.length > 254
+                || !/^\.?(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(settings.cookieDomain))) return false;
+        try {
+            const source = new URL(settings.url);
+            return ['http:', 'https:'].includes(source.protocol) && !source.username && !source.password
+                && !source.search && !source.hash && source.pathname.endsWith('/') && source.href === settings.url;
+        } catch { return false; }
+    }
+
     let config;
     try {
         config = JSON.parse(configNode?.textContent ?? 'null');
@@ -40,24 +55,27 @@
             throw new Error('Invalid consent audit configuration.');
         }
         const trackers = config.trackers ?? {};
-        if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity'].includes(key))
+        if (!trackers || typeof trackers !== 'object' || Object.keys(trackers).some(key => !['meta', 'clarity', 'matomo'].includes(key))
             || Object.hasOwn(trackers, 'meta') && (!trackers.meta || typeof trackers.meta !== 'object' || !/^[1-9][0-9]{0,19}$/.test(trackers.meta.id)
                 || typeof trackers.meta.id !== 'string' || typeof trackers.meta.sendPageView !== 'boolean' || !config.categories.includes('marketing'))
             || Object.hasOwn(trackers, 'clarity') && (!trackers.clarity || typeof trackers.clarity !== 'object' || !/^[a-z0-9]{1,32}$/.test(trackers.clarity.id)
                 || typeof trackers.clarity.id !== 'string' || typeof trackers.clarity.advertising !== 'boolean'
-                || !config.categories.includes('analytics') || trackers.clarity.advertising && !config.categories.includes('marketing'))) {
+                || !config.categories.includes('analytics') || trackers.clarity.advertising && !config.categories.includes('marketing'))
+            || Object.hasOwn(trackers, 'matomo') && (!validMatomo(trackers.matomo) || !config.categories.includes('analytics'))) {
             throw new Error('Invalid tracker runtime configuration.');
         }
         config.trackers = trackers;
         if (trackers.meta && (window.fbq !== undefined || window._fbq !== undefined)
             || trackers.clarity && window.clarity !== undefined
+            || trackers.matomo && (window._paq !== undefined || window.Matomo !== undefined || window.Piwik !== undefined)
             || [...document.scripts].some(script => {
                 if (!script.src) return false;
                 const source = new URL(script.src, document.baseURI);
                 return trackers.meta && source.hostname === 'connect.facebook.net' && source.pathname.endsWith('/fbevents.js')
-                    || trackers.clarity && ['www.clarity.ms', 'clarity.ms'].includes(source.hostname) && source.pathname.startsWith('/tag/');
+                    || trackers.clarity && ['www.clarity.ms', 'clarity.ms'].includes(source.hostname) && source.pathname.startsWith('/tag/')
+                    || trackers.matomo && /\/(?:matomo|piwik)\.js$/.test(source.pathname);
             })) {
-            throw new Error('Place Consent before Meta Pixel and Clarity and remove duplicate tracker bootstraps.');
+            throw new Error('Place Consent before tracker libraries and remove duplicate tracker bootstraps.');
         }
         if (config.google != null && (window.gtag !== undefined || window.dataLayer !== undefined
             && (!Array.isArray(window.dataLayer) || window.dataLayer.length !== 0)
@@ -707,6 +725,9 @@
     const trackerFailed = new Set();
     let metaPrevious = null;
     let clarityPrevious = null;
+    let matomoTracker = null;
+    let matomoPrevious = null;
+    let matomoLastPageUrl = null;
 
     function claritySignals() {
         const analytics = permits(current, 'analytics');
@@ -715,6 +736,11 @@
     }
 
     function trackerCommand(preset, ...args) {
+        if (preset === 'matomo') {
+            const [method, ...parameters] = args;
+            if (!matomoTracker || typeof matomoTracker[method] !== 'function') throw new Error(`The Matomo ${method} API is unavailable.`);
+            return matomoTracker[method](...parameters);
+        }
         const command = window[preset === 'meta' ? 'fbq' : 'clarity'];
         if (typeof command !== 'function') throw new Error(`The ${preset} browser API is unavailable.`);
         command(...args);
@@ -745,6 +771,23 @@
                 }
             }
         }
+        if (matomoTracker) {
+            const permitted = permits(current, 'analytics');
+            if (permitted === matomoPrevious) return;
+            try {
+                trackerCommand('matomo', permitted ? 'setConsentGiven' : 'forgetConsentGiven');
+                matomoPrevious = permitted;
+                if (!permitted) {
+                    trackerCommand('matomo', 'disableLinkTracking');
+                    trackerCommand('matomo', 'disableHeartBeatTimer');
+                    trackerCommand('matomo', 'deleteCookies');
+                }
+            } catch (error) {
+                trackerFailed.add('matomo');
+                report('matomo', error);
+                if (!permitted && trackerRecords.get('matomo')?.started) reload('tracker-consent');
+            }
+        }
     }
 
     if (config.trackers.meta) {
@@ -759,10 +802,19 @@
         clarity.q = [];
         window.clarity = clarity;
     }
+    if (config.trackers.matomo) {
+        const settings = config.trackers.matomo;
+        window._paq = [
+            ['requireConsent'], ['setTrackerUrl', `${settings.url}matomo.php`], ['setSiteId', settings.siteId],
+            ['setCookiePath', settings.cookiePath], ['forgetConsentGiven'],
+        ];
+        if (settings.cookieDomain !== null) window._paq.push(['setCookieDomain', settings.cookieDomain]);
+        if (window.location.protocol === 'https:') window._paq.push(['setSecureCookie', true]);
+    }
     updateTrackers();
 
     async function drainTrackers() {
-        for (const preset of ['meta', 'clarity']) {
+        for (const preset of ['meta', 'clarity', 'matomo']) {
             const settings = config.trackers[preset];
             const category = preset === 'meta' ? 'marketing' : 'analytics';
             sync();
@@ -772,7 +824,7 @@
             try {
                 const script = document.createElement('script');
                 script.src = preset === 'meta' ? 'https://connect.facebook.net/en_US/fbevents.js'
-                    : `https://www.clarity.ms/tag/${encodeURIComponent(settings.id)}`;
+                    : preset === 'clarity' ? `https://www.clarity.ms/tag/${encodeURIComponent(settings.id)}` : `${settings.url}matomo.js`;
                 if (preset === 'clarity' && claritySignals().ad_Storage === 'granted') {
                     trackerRecords.set('clarity-ads', { id: 'clarity-ads', category: 'marketing',
                         started: true, nodes: [], cancels: new Set(), trackerPreset: true });
@@ -784,6 +836,16 @@
                     trackerCommand('meta', 'init', settings.id);
                     sync();
                     if (settings.sendPageView && canRun(category)) trackerCommand('meta', 'track', 'PageView');
+                }
+                if (preset === 'matomo') {
+                    matomoTracker = window.Matomo?.getAsyncTracker?.(`${settings.url}matomo.php`, settings.siteId);
+                    if (!matomoTracker || typeof matomoTracker.requireConsent !== 'function') throw new Error('The Matomo tracker did not initialize.');
+                    updateTrackers();
+                    sync();
+                    if (!canRun(category) || trackerFailed.has(preset)) continue;
+                    if (settings.enableLinkTracking) trackerCommand('matomo', 'enableLinkTracking');
+                    sync();
+                    if (settings.sendPageView && canRun(category)) sendMatomoPageView({ url: window.location.href, title: document.title, referrer: document.referrer });
                 }
                 trackerLoaded.add(preset);
                 // The Clarity library replaces its queue stub. Always address the current API.
@@ -857,11 +919,141 @@
         },
     });
 
+    function matomoText(value, label, optional = false) {
+        if (optional && value === undefined) return undefined;
+        if (typeof value !== 'string' || !value.trim() || value.length > 1024 || /[\x00-\x1f\x7f]/.test(value)) {
+            throw new TypeError(`Matomo ${label} must be a non-empty string of at most 1024 characters without control characters.`);
+        }
+        return value;
+    }
+
+    function matomoNumber(value, label, optional = false) {
+        if (optional && value === undefined) return undefined;
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new TypeError(`Matomo ${label} must be a finite non-negative number.`);
+        return value;
+    }
+
+    function matomoObject(value, keys) {
+        if (!value || Object.prototype.toString.call(value) !== '[object Object]' || Object.keys(value).some(key => !keys.includes(key))) {
+            throw new TypeError('Invalid Matomo options.');
+        }
+    }
+
+    function matomoUrl(value, referrer = false) {
+        if (referrer && value === '') return '';
+        matomoText(value, 'URL');
+        const source = new URL(value, document.baseURI);
+        if (!['http:', 'https:'].includes(source.protocol) || source.username || source.password) throw new TypeError('Matomo URLs must use HTTP(S) without credentials.');
+        return source.href;
+    }
+
+    function matomoOperation(prepare, dispatch) {
+        try {
+            const data = prepare();
+            if (!config.trackers.matomo) throw new TypeError('The matomo preset is not enabled.');
+            sync();
+            const permitted = canRun('analytics');
+            return eventOperation(async () => {
+                if (!permitted) return false;
+                sync();
+                if (!canRun('analytics')) return false;
+                await initialized;
+                await schedulePresets();
+                sync();
+                if (!canRun('analytics') || !trackerLoaded.has('matomo') || trackerFailed.has('matomo')) return false;
+                // Multi-command operations also recheck before each command, including the final measurement.
+                const command = (...args) => {
+                    sync();
+                    if (!canRun('analytics')) return false;
+                    trackerCommand('matomo', ...args);
+                    return true;
+                };
+                return dispatch(data, command);
+            });
+        } catch (error) { return Promise.reject(error); }
+    }
+
+    function matomoPageOptions(options) {
+        matomoObject(options, ['url', 'title', 'referrer']);
+        return { url: matomoUrl(options.url === undefined ? window.location.href : options.url),
+            title: options.title === undefined ? document.title : matomoText(options.title, 'page title'),
+            referrer: options.referrer === undefined ? undefined : matomoUrl(options.referrer, true) };
+    }
+
+    function sendMatomoPageView(data, command = (...args) => {
+        sync();
+        if (!canRun('analytics')) return false;
+        trackerCommand('matomo', ...args);
+        return true;
+    }) {
+        if (!command('setCustomUrl', data.url) || !command('setDocumentTitle', data.title)
+            || !command('setReferrerUrl', data.referrer ?? matomoLastPageUrl ?? document.referrer)
+            || !command('trackPageView')) return false;
+        matomoLastPageUrl = data.url;
+        return true;
+    }
+
+    function matomoCommerce(options, order) {
+        matomoObject(options, order ? ['id', 'total', 'subtotal', 'tax', 'shipping', 'discount', 'items'] : ['total', 'items']);
+        if (!Array.isArray(options.items) || options.items.length > 200) throw new TypeError('Matomo commerce requires an items array of at most 200 products.');
+        const skus = new Set();
+        const items = options.items.map(item => {
+            matomoObject(item, ['sku', 'name', 'category', 'price', 'quantity']);
+            const sku = matomoText(item.sku, 'product SKU');
+            if (skus.has(sku)) throw new TypeError('Matomo product SKUs must be unique within an operation.');
+            skus.add(sku);
+            let category = item.category;
+            if (Array.isArray(category)) {
+                if (category.length > 5) throw new TypeError('Matomo supports at most five product categories.');
+                category = category.map(value => matomoText(value, 'product category'));
+            } else category = matomoText(category, 'product category', true);
+            const quantity = item.quantity === undefined ? 1 : item.quantity;
+            if (!Number.isSafeInteger(quantity) || quantity < 1) throw new TypeError('Matomo product quantity must be a positive safe integer.');
+            return [sku, matomoText(item.name, 'product name', true), category, matomoNumber(item.price, 'product price', true), quantity];
+        });
+        return { items, total: matomoNumber(options.total, 'total'),
+            ...(order ? { id: matomoText(options.id, 'order ID'), subtotal: matomoNumber(options.subtotal, 'subtotal', true),
+                tax: matomoNumber(options.tax, 'tax', true), shipping: matomoNumber(options.shipping, 'shipping', true), discount: matomoNumber(options.discount, 'discount', true) } : {}) };
+    }
+
+    function sendMatomoCommerce(data, command, order) {
+        if (!command('clearEcommerceCart')) return false;
+        try {
+            for (const item of data.items) if (!command('addEcommerceItem', ...item)) return false;
+            return order ? command('trackEcommerceOrder', data.id, data.total, data.subtotal, data.tax, data.shipping, data.discount)
+                : command('trackEcommerceCartUpdate', data.total);
+        } finally {
+            // Do not leave an application's products attached to a later independent operation.
+            trackerCommand('matomo', 'clearEcommerceCart');
+        }
+    }
+
+    const matomoApi = Object.freeze({
+        event: (category, action, name, value) => matomoOperation(() => [matomoText(category, 'event category'), matomoText(action, 'event action'),
+            matomoText(name, 'event name', true), matomoNumber(value, 'event value', true)], (args, command) => command('trackEvent', ...args)),
+        pageView: (options = {}) => matomoOperation(() => matomoPageOptions(options), sendMatomoPageView),
+        goal: (id, revenue) => matomoOperation(() => {
+            if (!Number.isInteger(id) || id < 1 || id > 2147483647) throw new TypeError('Matomo goal ID must be a positive integer up to 2147483647.');
+            return [id, matomoNumber(revenue, 'goal revenue', true)];
+        }, (args, command) => command('trackGoal', ...args)),
+        search: (keyword, category, resultsCount) => matomoOperation(() => {
+            if (resultsCount !== undefined && (!Number.isSafeInteger(resultsCount) || resultsCount < 0)) throw new TypeError('Matomo search results count must be a non-negative safe integer.');
+            return [matomoText(keyword, 'search keyword'), matomoText(category, 'search category', true), resultsCount];
+        }, (args, command) => command('trackSiteSearch', ...args)),
+        link: (url, type = 'link') => matomoOperation(() => {
+            if (!['link', 'download'].includes(type)) throw new TypeError('Matomo link type must be link or download.');
+            return [matomoUrl(url), type];
+        }, (args, command) => command('trackLink', ...args)),
+        ecommerceCart: options => matomoOperation(() => matomoCommerce(options, false), (data, command) => sendMatomoCommerce(data, command, false)),
+        ecommerceOrder: options => matomoOperation(() => matomoCommerce(options, true), (data, command) => sendMatomoCommerce(data, command, true)),
+    });
+
     const api = {
         __consentForLaravel: true,
         google: googleApi,
         meta: metaApi,
         clarity: clarityApi,
+        matomo: matomoApi,
         state: () => snapshot(sync()),
         allowed: category => { checkCategory(category); sync(); return category === 'necessary' || canRun(category); },
         choose,

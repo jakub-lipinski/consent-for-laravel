@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'Tagi Google wysyłają również sygnały pomiarowe bez cookies przed dokonaniem wyboru oraz po odmowie opcjonalnych cookies.',
     'presets' => [
+        'matomo' => ['name' => 'Matomo', 'description' => 'Pomiar wizyt, interakcji i zakupów na stronie.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Pomiar wizyt i korzystania ze strony.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Pomiar konwersji reklamowych i zarządzanie sygnałami zgody reklamowej.'],
         'meta-pixel' => ['name' => 'Meta Pixel', 'description' => 'Pomiar skuteczności reklam i interakcji ze stroną.'],

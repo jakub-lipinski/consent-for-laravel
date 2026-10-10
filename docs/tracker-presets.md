@@ -1,5 +1,7 @@
 # Meta Pixel and Microsoft Clarity
 
+For the separate Matomo integration, see the [Matomo guide](matomo.md).
+
 The package provides optional ID-based presets. Both stay disabled by default and use strict browser gates, independently of Google's Basic/Advanced setting. No Meta or Clarity library request is made while the required category is pending or denied.
 
 ## Setup

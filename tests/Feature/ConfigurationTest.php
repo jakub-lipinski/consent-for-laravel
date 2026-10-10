@@ -3,6 +3,7 @@
 use ConsentForLaravel\ConsentForLaravel\BannerSettings;
 use ConsentForLaravel\ConsentForLaravel\ConsentForLaravelServiceProvider;
 use ConsentForLaravel\ConsentForLaravel\ConsentSettings;
+use ConsentForLaravel\ConsentForLaravel\MatomoSettings;
 use ConsentForLaravel\ConsentForLaravel\ServiceRegistry;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 
@@ -111,6 +112,11 @@ it('caches custom service and cookie configuration without closures or objects',
     $configuration['ui']['theme'] = 'auto';
     $configuration['ui']['dark_colors'] = ['accent' => '#a5e4c4'];
     $configuration['services'] = ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']];
+    $configuration['presets']['matomo'] = [
+        'enabled' => true, 'url' => 'https://stats.example.test/analytics', 'site_id' => 3,
+        'send_page_view' => false, 'enable_link_tracking' => true,
+        'cookie_path' => '/shop', 'cookie_domain' => '.example.test',
+    ];
     $configPath = config_path('consent.php');
     $cachePath = $this->app->getCachedConfigPath();
     file_put_contents($configPath, '<?php return '.var_export($configuration, true).';');
@@ -127,7 +133,11 @@ it('caches custom service and cookie configuration without closures or objects',
             ->and((new BannerSettings($cached['ui']))->colors['accent'])->toBe('#d86a32')
             ->and((new BannerSettings($cached['ui']))->theme)->toBe('auto')
             ->and((new BannerSettings($cached['ui']))->darkColors['accent'])->toBe('#a5e4c4')
-            ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics');
+            ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics')
+            ->and((new MatomoSettings($cached['presets']['matomo']))->toArray())->toBe([
+                'url' => 'https://stats.example.test/analytics/', 'siteId' => '3', 'sendPageView' => false,
+                'enableLinkTracking' => true, 'cookiePath' => '/shop', 'cookieDomain' => '.example.test',
+            ]);
     } finally {
         $this->artisan('config:clear')->assertExitCode(0);
         unlink($configPath);

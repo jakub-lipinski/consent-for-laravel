@@ -1259,3 +1259,340 @@ test('oversized audit notices are rejected without a network request or a new gr
     assert.equal(requests, 0);
     assert.equal(p.api.allowed('analytics'), false);
 });
+
+const matomoConfig = overrides => ({ url: 'https://stats.example.test/analytics/', siteId: '3', sendPageView: true,
+    enableLinkTracking: true, cookiePath: '/', cookieDomain: null, ...overrides });
+const matomoFixture = `
+window.matomoCommands = _paq.map(args => Array.from(args));
+window.matomoOrders = []; window.matomoCart = {};
+window.matomoTracker = Object.fromEntries(['requireConsent','setConsentGiven','forgetConsentGiven','deleteCookies',
+    'enableLinkTracking','disableLinkTracking','disableHeartBeatTimer','setCustomUrl','setDocumentTitle','setReferrerUrl',
+    'trackPageView','trackEvent','trackGoal','trackSiteSearch','trackLink','clearEcommerceCart','addEcommerceItem',
+    'trackEcommerceOrder','trackEcommerceCartUpdate'].map(method => [method, function(...args) {
+        matomoCommands.push([method, ...args]);
+        if (method === 'trackPageView') order.push('matomo-page');
+        if (method === 'clearEcommerceCart') matomoCart = {};
+        if (method === 'addEcommerceItem') matomoCart[args[0]] = args;
+        if (method === 'trackEcommerceOrder' || method === 'trackEcommerceCartUpdate') matomoOrders.push({method, args, items: JSON.parse(JSON.stringify(matomoCart))});
+    }]));
+window.Matomo = { getAsyncTracker: function(...args) { window.matomoTarget = args; return matomoTracker; } };
+window.Piwik = Matomo; window._paq = { push: function(args) { matomoTracker[args[0]](...args.slice(1)); } };
+`;
+const matomoFiles = { '/analytics/matomo.js': matomoFixture };
+const matomoCommands = p => plain(p.window.matomoCommands);
+const matomoServices = [{ id: 'matomo', category: 'analytics', cookies: [
+    ...['_pk_id', '_pk_ses', '_pk_ref', '_pk_cvar', '_pk_hsr'].map(prefix => ({ prefix: `${prefix}.3.`, name: null, path: '/', domain: null })),
+    ...['_pk_testcookie', 'mtm_consent', 'mtm_cookie_consent', 'mtm_consent_removed'].map(name => ({ name, prefix: null, path: '/', domain: null })),
+] }];
+const matomoCalls = api => [
+    api.event('Account', 'Registered'), api.pageView(), api.goal(1), api.search('boots'), api.link('/download.pdf', 'download'),
+    api.ecommerceCart({ total: 0, items: [] }), api.ecommerceOrder({ id: 'order-1', total: 9, items: [{ sku: 'sku-1', price: 9 }] }),
+];
+
+test('Matomo stays inert for pending, refused, and marketing-only choices with no event replay', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles });
+    assert.ok(Object.isFrozen(p.api.matomo));
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(await Promise.all(matomoCalls(p.api.matomo)), Array(7).fill(false));
+    await p.api.rejectOptional(); await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.equal(matomoCommands(p).filter(args => args[0] === 'trackPageView').length, 1);
+    assert.equal(matomoCommands(p).some(args => ['trackEvent', 'trackGoal', 'trackSiteSearch', 'trackLink', 'trackEcommerceOrder', 'trackEcommerceCartUpdate'].includes(args[0])), false);
+});
+
+test('Matomo SDK loads once with scoped configuration, nonce, and consent before its initial page view', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ cookiePath: '/shop', cookieDomain: '.example.test' }) } },
+        files: matomoFiles, html: block('custom', 'analytics', inline('order.push("custom")')) });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/analytics/matomo.js']);
+    const calls = matomoCommands(p);
+    assert.deepEqual(calls.slice(0, 7), [['requireConsent'], ['setTrackerUrl', 'https://stats.example.test/analytics/matomo.php'],
+        ['setSiteId', '3'], ['setCookiePath', '/shop'], ['forgetConsentGiven'], ['setCookieDomain', '.example.test'], ['setSecureCookie', true]]);
+    assert.ok(calls.findIndex(args => args[0] === 'setConsentGiven') < calls.findIndex(args => args[0] === 'trackPageView'));
+    assert.deepEqual(plain(p.window.matomoTarget), ['https://stats.example.test/analytics/matomo.php', '3']);
+    assert.deepEqual(plain(p.window.order), ['matomo-page', 'custom']);
+    assert.equal(p.window.document.querySelector('script[src$="matomo.js"]').nonce, 'fixture-nonce');
+    await p.api.acceptAll(); await p.api.whenIdle();
+    p.window.document.body.insertAdjacentHTML('beforeend', block('later', 'analytics', inline('order.push("later")')));
+    await delay(10); await p.api.whenIdle();
+    assert.equal(p.loader.requests.length, 1);
+    assert.equal(matomoCommands(p).filter(args => args[0] === 'trackPageView').length, 1);
+});
+
+test('a restored Matomo grant initializes and disabled automatic tracking leaves measurements to the application', async t => {
+    const config = configuration({ trackers: { matomo: matomoConfig({ sendPageView: false, enableLinkTracking: false }) } });
+    const p = await page(t, { config, state: decision(config), files: matomoFiles });
+    assert.equal(matomoCommands(p).some(args => ['trackPageView', 'enableLinkTracking'].includes(args[0])), false);
+    assert.equal(await p.api.matomo.pageView({ url: '/pricing', title: 'Pricing' }), true);
+    assert.deepEqual(matomoCommands(p).slice(-4), [['setCustomUrl', 'https://example.test/pricing'], ['setDocumentTitle', 'Pricing'], ['setReferrerUrl', ''], ['trackPageView']]);
+});
+
+test('Matomo events, goals, search, links, and SPA page views use the current tracker with analytics permission', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles });
+    await p.api.choose({ analytics: true });
+    assert.equal(await p.api.matomo.event('Marketing', 'Clicked', 'Pricing CTA', 0), true);
+    assert.deepEqual(matomoCommands(p).at(-1), ['trackEvent', 'Marketing', 'Clicked', 'Pricing CTA', 0]);
+    assert.equal(await p.api.matomo.goal(7, 12.5), true);
+    assert.deepEqual(matomoCommands(p).at(-1), ['trackGoal', 7, 12.5]);
+    assert.equal(await p.api.matomo.search('buty', 'Sklep', 0), true);
+    assert.deepEqual(matomoCommands(p).at(-1), ['trackSiteSearch', 'buty', 'Sklep', 0]);
+    assert.equal(await p.api.matomo.link('/file.pdf', 'download'), true);
+    assert.deepEqual(matomoCommands(p).at(-1), ['trackLink', 'https://example.test/file.pdf', 'download']);
+    assert.equal(await p.api.matomo.pageView({ url: '/pricing', title: 'Cennik' }), true);
+    assert.deepEqual(matomoCommands(p).slice(-4), [['setCustomUrl', 'https://example.test/pricing'], ['setDocumentTitle', 'Cennik'], ['setReferrerUrl', url], ['trackPageView']]);
+    assert.equal(await p.api.matomo.pageView({ url: '/signup', title: 'Signup' }), true);
+    assert.deepEqual(matomoCommands(p).slice(-4), [['setCustomUrl', 'https://example.test/signup'], ['setDocumentTitle', 'Signup'], ['setReferrerUrl', 'https://example.test/pricing'], ['trackPageView']]);
+});
+
+test('Matomo captures payloads at invocation and serializes complete ecommerce operations without product leakage', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ sendPageView: false }) } }, files: matomoFiles });
+    await p.api.choose({ analytics: true });
+    const data = { id: 'order-42', total: 23, subtotal: 20, tax: 1, shipping: 2, discount: 0,
+        items: [{ sku: 'sku-1', name: 'Boots', category: ['Shoes', 'Winter'], price: 10, quantity: 2 }] };
+    const order = p.api.matomo.ecommerceOrder(data);
+    data.id = 'mutated'; data.items[0].sku = 'other'; data.items[0].category.push('mutated');
+    const cart = p.api.matomo.ecommerceCart({ total: 0, items: [] });
+    assert.equal(await order, true); assert.equal(await cart, true);
+    assert.deepEqual(plain(p.window.matomoOrders), [
+        { method: 'trackEcommerceOrder', args: ['order-42', 23, 20, 1, 2, 0], items: { 'sku-1': ['sku-1', 'Boots', ['Shoes', 'Winter'], 10, 2] } },
+        { method: 'trackEcommerceCartUpdate', args: [0], items: {} },
+    ]);
+    assert.deepEqual(plain(p.window.matomoCart), {});
+    const view = { url: '/original', title: 'Original' };
+    const result = p.api.matomo.pageView(view); view.url = '/mutated'; view.title = 'Mutated';
+    assert.equal(await result, true);
+    assert.deepEqual(matomoCommands(p).slice(-4).slice(0, 2), [['setCustomUrl', 'https://example.test/original'], ['setDocumentTitle', 'Original']]);
+});
+
+test('denied Matomo events behind queued acceptance remain denied', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ sendPageView: false }) } }, files: matomoFiles });
+    const grant = p.api.acceptAll();
+    const results = Promise.all(matomoCalls(p.api.matomo));
+    await grant;
+    assert.deepEqual(await results, Array(7).fill(false));
+    await p.api.whenIdle();
+    assert.equal(matomoCommands(p).some(args => args[0].startsWith('track')), false);
+});
+
+test('Matomo withdrawal denies synchronously before listeners, cleans scoped cookies, and forces a fresh document', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() }, services: matomoServices }, files: matomoFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    for (const name of ['_pk_id.3.hash', '_pk_ses.3.hash', 'mtm_consent_removed', '_pk_id.4.hash', 'app_session', 'XSRF-TOKEN']) p.window.document.cookie = `${name}=keep; Path=/`;
+    p.api.onRevoke('analytics', () => {}, { reload: false });
+    let observed;
+    p.api.onChange(() => { observed = matomoCommands(p).slice(-4); });
+    await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.deepEqual(observed, [['forgetConsentGiven'], ['disableLinkTracking'], ['disableHeartBeatTimer'], ['deleteCookies']]);
+    assert.equal(p.reloads.length, 1);
+    assert.equal(p.api.state().choices.analytics, false);
+    assert.equal(p.api.state().choices.marketing, true);
+    assert.equal(await p.api.matomo.event('Account', 'Login'), false);
+    assert.equal(p.window.document.cookie.includes('_pk_id.3.hash'), false);
+    assert.equal(p.window.document.cookie.includes('_pk_ses.3.hash'), false);
+    assert.equal(p.window.document.cookie.includes('mtm_consent_removed'), false);
+    for (const name of ['_pk_id.4.hash', 'app_session', 'XSRF-TOKEN']) assert.ok(p.window.document.cookie.includes(`${name}=`));
+});
+
+for (const transition of ['expiry', 'external', 'forget']) {
+    test(`Matomo ${transition} invalidation sends denial and reloads`, async t => {
+        const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles });
+        await p.api.acceptAll(); await p.api.whenIdle();
+        if (transition === 'forget') await p.api.forget();
+        else {
+            const value = transition === 'expiry' ? decision(p.config, { analytics: true }, { decidedAt: 1, expiresAt: 2 }) : decision(p.config, {});
+            store(p.jar, value); await p.api.refresh();
+        }
+        await p.api.whenIdle();
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.ok(matomoCommands(p).some(args => args[0] === 'forgetConsentGiven'));
+        assert.equal(matomoCommands(p).at(-1)[0], 'deleteCookies');
+        assert.equal(p.reloads.length, 1);
+    });
+}
+
+test('Matomo events never delay withdrawal during an in-flight SDK load', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() }, scriptTimeoutMs: 300 },
+        files: { '/analytics/matomo.js': { body: matomoFixture, delay: 150 } } });
+    await p.api.choose({ analytics: true });
+    const event = p.api.matomo.event('Account', 'Created');
+    for (let attempt = 0; p.loader.requests.length === 0 && attempt < 100; attempt++) await delay(1);
+    const refused = await Promise.race([p.api.rejectOptional(), delay(80).then(() => null)]);
+    assert.ok(refused, 'withdrawal must not wait for the tracker event queue');
+    assert.equal(await event, false); await p.api.whenIdle();
+    assert.equal(p.reloads.length, 1);
+    assert.equal(p.window.matomoCommands, undefined);
+});
+
+test('Matomo command sequences recheck consent before measuring and clear abandoned ecommerce products', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ sendPageView: false }) } }, files: matomoFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    const original = p.window.matomoTracker.addEcommerceItem;
+    p.window.matomoTracker.addEcommerceItem = (...args) => {
+        original(...args); p.window.document.cookie = `consent_preferences=${encodeURIComponent(JSON.stringify(decision(p.config, {})))}; Path=/`;
+    };
+    assert.equal(await p.api.matomo.ecommerceOrder({ id: 'order-race', total: 1, items: [{ sku: 'sku-race', price: 1 }] }), false);
+    await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.matomoOrders), []);
+    assert.deepEqual(plain(p.window.matomoCart), {});
+    assert.equal(p.reloads.length, 1);
+});
+
+test('Matomo failures are isolated from other trackers and custom blocks and never retry', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig(), clarity: trackerConfig().clarity } },
+        files: { ...trackerFiles, '/analytics/matomo.js': new Error('offline') }, html: block('custom', 'analytics', inline('order.push("custom")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.equal(await p.api.matomo.event('Checkout', 'Started'), false);
+    assert.equal(await p.api.clarity.event('checkout'), true);
+    assert.ok(p.window.order.includes('custom'));
+    assert.equal(p.errors.filter(error => error.code === 'matomo').length, 1);
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.equal(p.loader.requests.filter(path => path === '/analytics/matomo.js').length, 1);
+});
+
+test('a missing Matomo SDK API cannot count as successful initialization', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: { '/analytics/matomo.js': 'window.invalidMatomo = true;' } });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.equal(await p.api.matomo.event('Account', 'Registered'), false);
+    assert.ok(p.errors.some(error => error.code === 'matomo'));
+});
+
+test('Matomo consent command errors preserve denial and demand reload', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    p.window.matomoTracker.forgetConsentGiven = () => { throw new Error('provider failure'); };
+    await p.api.rejectOptional(); await p.api.whenIdle();
+    assert.equal(p.api.state().choices.analytics, false);
+    assert.equal(p.reloads.length, 1);
+    assert.ok(p.errors.some(error => error.code === 'matomo'));
+});
+
+test('Matomo timeouts halt activation and follow shared reload recovery', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() }, scriptTimeoutMs: 20 },
+        files: { '/analytics/matomo.js': 'hang' }, html: block('custom', 'analytics', inline('order.push("custom")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(p.reloads, [{ reason: 'script-timeout' }]);
+    assert.equal(await p.api.matomo.pageView(), false);
+    assert.deepEqual(plain(p.window.order), []);
+});
+
+test('Matomo stays strictly gated even when Google Advanced loads before permission', async t => {
+    const p = await page(t, { config: { google: googleConfig('advanced'), trackers: { matomo: matomoConfig() } }, files: { ...googleFiles, ...matomoFiles } });
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+    assert.equal(await p.api.matomo.event('Account', 'Login'), false);
+    await p.api.choose({ marketing: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/gtag/js']);
+});
+
+for (const global of ['_paq', 'Matomo', 'Piwik']) {
+    test(`Matomo refuses an existing ${global} installation before optional activation`, async t => {
+        const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, before: window => { window[global] = {}; } });
+        assert.equal(p.api, undefined);
+        assert.deepEqual(p.loader.requests, []);
+        assert.ok(p.errors.some(error => error.code === 'configuration'));
+    });
+}
+
+test('duplicate Matomo scripts and malformed browser settings fail closed', async t => {
+    for (const source of ['https://stats.example.test/analytics/matomo.js', 'https://stats.example.test/piwik.js']) {
+        const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, head: `<script type="application/json" src="${source}"></script>` });
+        assert.equal(p.api, undefined); assert.deepEqual(p.loader.requests, []);
+    }
+    for (const settings of [null, matomoConfig({ url: 'javascript:alert(1)' }), matomoConfig({ url: 'https://user:secret@stats.example.test/' }),
+        matomoConfig({ url: 'https://stats.example.test/?token=1' }), matomoConfig({ url: 'https://stats.example.test/../' }),
+        matomoConfig({ siteId: 3 }), matomoConfig({ siteId: '0' }), matomoConfig({ cookiePath: '/; Secure' }),
+        matomoConfig({ sendPageView: 1 }), matomoConfig({ cookieDomain: 'https://example.test' })]) {
+        const p = await page(t, { config: { trackers: { matomo: settings } } });
+        assert.equal(p.api, undefined); assert.deepEqual(p.loader.requests, []);
+    }
+});
+
+test('invalid Matomo inputs reject without queuing any provider commands', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles });
+    const calls = [
+        () => p.api.matomo.event('', 'Clicked'), () => p.api.matomo.event('A', 'B', 'C', Infinity),
+        () => p.api.matomo.event('A', 'B', null), () => p.api.matomo.goal('1'), () => p.api.matomo.goal(0),
+        () => p.api.matomo.search('boots', undefined, -1), () => p.api.matomo.search('boots', undefined, 1.5),
+        () => p.api.matomo.pageView({ url: 'javascript:alert(1)' }), () => p.api.matomo.pageView({ title: '' }),
+        () => p.api.matomo.pageView({ url: null }),
+        () => p.api.matomo.pageView({ identify: 'user-1' }), () => p.api.matomo.link('/file', 'other'),
+        () => p.api.matomo.ecommerceOrder({ id: 'order', total: -1, items: [] }),
+        () => p.api.matomo.ecommerceOrder({ id: 'order', total: 1, items: [{ sku: 'a', quantity: 0 }] }),
+        () => p.api.matomo.ecommerceOrder({ id: 'order', total: 1, items: [{ sku: 'a', quantity: null }] }),
+        () => p.api.matomo.ecommerceCart({ total: 1, items: [{ sku: 'a' }, { sku: 'a' }] }),
+        () => p.api.matomo.ecommerceCart({ total: 1, items: [{ sku: 'a', category: Array(6).fill('cat') }] }),
+        () => p.api.matomo.ecommerceCart({ total: 1, items: Array(201).fill({ sku: 'a' }) }),
+    ];
+    for (const call of calls) await assert.rejects(call(), error => error.name === 'TypeError');
+    assert.deepEqual(p.loader.requests, []);
+    const disabled = await page(t);
+    await assert.rejects(disabled.api.matomo.event('Account', 'Login'), /not enabled/);
+});
+
+test('failed preference storage does not load Matomo or signal consent', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: matomoFiles, before: window => {
+        const original = Object.getOwnPropertyDescriptor(window.Document.prototype, 'cookie');
+        Object.defineProperty(window.document, 'cookie', { get: () => original.get.call(window.document), set: () => {} });
+    } });
+    await assert.rejects(p.api.acceptAll(), /could not be stored/); await p.api.whenIdle();
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.deepEqual(p.loader.requests, []);
+    assert.equal(await p.api.matomo.event('Account', 'Login'), false);
+});
+
+test('real PHP Matomo configuration and consent restore correctly in the browser', async t => {
+    const bridge = phpBridge({ presets: { matomo: { enabled: true, url: 'https://stats.example.test/analytics', site_id: 3 } } });
+    const p = await page(t, { config: bridge.config, state: bridge.decision, files: matomoFiles });
+    assert.equal(p.api.allowed('analytics'), true);
+    assert.equal(await p.api.matomo.goal(1), true);
+    assert.equal(matomoCommands(p).filter(args => args[0] === 'trackPageView').length, 1);
+    assert.deepEqual(plain(p.window.matomoTarget), ['https://stats.example.test/analytics/matomo.php', '3']);
+});
+
+for (const method of ['setConsentGiven', 'enableLinkTracking']) {
+    test(`Matomo rechecks a changed decision after ${method} before any initial measurement`, async t => {
+        const denied = `window.document.cookie = 'consent_preferences=${encodeURIComponent(JSON.stringify(decision(configuration(), {})))}; Path=/';`;
+        const fixture = matomoFixture + `const original = matomoTracker.${method}; matomoTracker.${method} = (...args) => { original(...args); ${denied} };`;
+        const p = await page(t, { config: { trackers: { matomo: matomoConfig() } }, files: { '/analytics/matomo.js': fixture } });
+        await p.api.acceptAll(); await p.api.whenIdle();
+        assert.equal(matomoCommands(p).some(args => args[0] === 'trackPageView'), false);
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.reloads.length, 1);
+    });
+}
+
+test('Matomo page views stop before their measurement if permission changes mid-operation', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ sendPageView: false }) } }, files: matomoFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    const original = p.window.matomoTracker.setDocumentTitle;
+    p.window.matomoTracker.setDocumentTitle = (...args) => {
+        original(...args); store(p.jar, decision(p.config, {}));
+    };
+    assert.equal(await p.api.matomo.pageView({ url: '/checkout', title: 'Checkout' }), false);
+    await p.api.whenIdle();
+    assert.equal(matomoCommands(p).some(args => args[0] === 'trackPageView'), false);
+    assert.equal(p.reloads.length, 1);
+});
+
+test('Matomo commerce command failures clear products and leave the event queue usable', async t => {
+    const p = await page(t, { config: { trackers: { matomo: matomoConfig({ sendPageView: false }) } }, files: matomoFiles });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    p.window.matomoTracker.trackEcommerceOrder = () => { throw new Error('rejected by provider'); };
+    await assert.rejects(p.api.matomo.ecommerceOrder({ id: 'failed', total: 9, items: [{ sku: 'failed-sku' }] }), /rejected by provider/);
+    assert.deepEqual(plain(p.window.matomoCart), {});
+    assert.equal(await p.api.matomo.ecommerceCart({ total: 0, items: [] }), true);
+    assert.deepEqual(plain(p.window.matomoOrders[0].items), {});
+    assert.equal(await p.api.matomo.event('Account', 'Login'), true);
+});
+
+test('Matomo preserves preset ordering alongside Google, Meta, Clarity, and custom blocks', async t => {
+    const p = await page(t, { config: { google: googleConfig(), trackers: { ...trackerConfig(), matomo: matomoConfig() } },
+        files: { ...googleFiles, ...trackerFiles, ...matomoFiles }, html: block('custom', 'analytics', inline('order.push("custom")')) });
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/gtag/js', '/en_US/fbevents.js', '/tag/abc123def4', '/analytics/matomo.js']);
+    assert.deepEqual(plain(p.window.order), ['matomo-page', 'custom']);
+    assert.equal(await p.api.google.event('G-ABCD1234', 'login'), true);
+    assert.equal(await p.api.meta.track('Lead'), true);
+    assert.equal(await p.api.clarity.event('login'), true);
+    assert.equal(await p.api.matomo.event('Account', 'Login'), true);
+});

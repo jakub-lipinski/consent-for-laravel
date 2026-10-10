@@ -6,12 +6,13 @@ use InvalidArgumentException;
 
 final readonly class TrackerSettings
 {
-    public const PRESET_KEYS = ['ga4', 'google_ads', 'meta_pixel', 'clarity'];
+    public const PRESET_KEYS = ['ga4', 'google_ads', 'meta_pixel', 'clarity', 'matomo'];
 
     public const SERVICE_DEFAULTS = [
         'meta-pixel' => ['name' => 'Meta Pixel', 'description' => 'Measure advertising results and interactions with this website.'],
         'microsoft-clarity' => ['name' => 'Microsoft Clarity', 'description' => 'Understand website usage through session recordings and heatmaps.'],
         'microsoft-clarity-ads' => ['name' => 'Microsoft Clarity advertising', 'description' => 'Allow advertising-related storage in Microsoft Clarity.'],
+        'matomo' => ['name' => 'Matomo', 'description' => 'Measure website visits, interactions, and purchases.'],
     ];
 
     /** @var array<string, array<string, mixed>> */
@@ -76,6 +77,11 @@ final readonly class TrackerSettings
             if (! $meta && $option) {
                 $services['microsoft-clarity-ads'] = $advertisingService;
             }
+        }
+        $matomo = new MatomoSettings(array_key_exists('matomo', $presets) ? $presets['matomo'] : []);
+        $services += $matomo->services();
+        if ($matomo->toArray() !== null) {
+            $trackers['matomo'] = $matomo->toArray();
         }
         $this->services = $services;
         $this->trackers = $trackers;

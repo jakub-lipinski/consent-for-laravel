@@ -42,6 +42,7 @@ it('renders every bundled language and preset purpose in both variants', functio
         'google_ads' => ['enabled' => true, 'conversion_id' => 'AW-123456789'],
         'meta_pixel' => ['enabled' => true, 'pixel_id' => '123456789012345'],
         'clarity' => ['enabled' => true, 'project_id' => 'abc123def4', 'advertising' => true],
+        'matomo' => ['enabled' => true, 'url' => 'https://stats.example.test/', 'site_id' => '1'],
     ]]);
     $messages = require dirname(__DIR__, 2).'/resources/lang/'.$locale.'/messages.php';
     $html = Blade::render('<x-consent::banner />');

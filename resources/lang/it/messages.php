@@ -3,6 +3,7 @@
 return [
     'google_advanced' => 'I tag Google inviano anche segnali di misurazione senza cookie prima della tua scelta e quando i cookie facoltativi vengono rifiutati.',
     'presets' => [
+        'matomo' => ['name' => 'Matomo', 'description' => 'Misurare le visite, le interazioni e gli acquisti su questo sito.'],
         'google-ga4' => ['name' => 'Google Analytics 4', 'description' => 'Misurare le visite e l’utilizzo del sito.'],
         'google-ads' => ['name' => 'Google Ads', 'description' => 'Misurare le conversioni pubblicitarie e gestire i segnali di consenso pubblicitario.'],
         'meta-pixel' => ['name' => 'Meta Pixel', 'description' => 'Misurare i risultati pubblicitari e le interazioni con questo sito.'],

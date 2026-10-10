@@ -37,7 +37,7 @@ All methods are on `window.Consent`. Optional categories must be registered befo
 
 Decision promises resolve after persistence and cleanup, independently of loading newly allowed scripts. Use `whenIdle()` when testing or when you need to wait for those scripts. It does not await asynchronous tasks spawned by application callbacks or vendor code.
 
-Preset event helpers have their own ordered queue. They await preset initialization, independently of custom script completion, and recheck consent before dispatch. A pending event never blocks saving a decision or withdrawing consent. Modules inside `@consent` may await the Google, Meta, and Clarity event helpers; do not await `whenIdle()` inside a gated module, because it includes that module's own completion.
+Preset event helpers have their own ordered queue. They await preset initialization, independently of custom script completion, and recheck consent before dispatch. A pending event never blocks saving a decision or withdrawing consent. Modules inside `@consent` may await the Google, Meta, Clarity, and Matomo event helpers; do not await `whenIdle()` inside a gated module, because it includes that module's own completion.
 
 ```js
 try {
@@ -144,3 +144,9 @@ The runtime now includes the optional gtag.js bridge and GA4/Google Ads presets.
 `Consent.meta.track(name, parameters, options)` and `trackCustom` send guarded Meta events. `Consent.clarity.event(name)` sends a guarded Clarity custom event; `Consent.clarity.state()` inspects frozen Consent API v2 signals without loading its SDK. Both presets are disabled by default, use strict category gates, preserve permission at invocation/dispatch, and discard denied events without later replay.
 
 Meta needs marketing. Clarity needs analytics; ad storage also needs explicitly enabled advertising and marketing. Active preset withdrawal, including Clarity advertising withdrawal, always reloads even when a custom hook supplies `reload: false`. See the [tracker guide](tracker-presets.md) for complete configuration, payloads, cookie scopes, and lifecycle behavior.
+
+## Matomo
+
+The Matomo preset loads after eligible Meta/Clarity presets and before custom Blade blocks. It requires analytics permission in every Google mode. The default configuration sends one initial page view and enables automatic outlink/download tracking; `send_page_view` and `enable_link_tracking` can disable these separately.
+
+`Consent.matomo.event`, `pageView`, `goal`, `search`, `link`, `ecommerceCart`, and `ecommerceOrder` all check permission at invocation and before dispatch. Multi-command page views and commerce operations recheck before each command, and commerce items are cleared between operations. Active withdrawal sends Matomo's denial signal, disables automatic link/heartbeat tracking, deletes declared cookies, and requires reload. See the [Matomo guide](matomo.md) for configuration, API signatures, examples, and failure behavior.

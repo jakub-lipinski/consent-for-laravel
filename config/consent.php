@@ -214,6 +214,18 @@ return [
             // Advertising also requires marketing permission.
             'advertising' => false,
         ],
+
+        'matomo' => [
+            'enabled' => false,
+            // Matomo Cloud or your own instance, including a subdirectory.
+            'url' => env('CONSENT_MATOMO_URL'),
+            'site_id' => env('CONSENT_MATOMO_SITE_ID'),
+            'send_page_view' => true,
+            'enable_link_tracking' => true,
+            // These scopes configure Matomo cookies and their withdrawal cleanup.
+            'cookie_path' => '/',
+            'cookie_domain' => null,
+        ],
     ],
 
     /*

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add a disabled-by-default Matomo preset for Cloud and self-hosted instances, with strict analytics consent, automatic page views/outlinks/downloads, seven translated purpose descriptions, and site-specific cookie cleanup.
+- Add guarded Matomo helpers for events, goals, searches, links, SPA page views, and e-commerce carts/orders. Denied events are discarded; active withdrawal signals denial before listeners and requires reload.
+- Validate and fingerprint Matomo destinations, options, purposes, and cookie scopes without changing existing decisions when the preset is disabled. See the [Matomo guide](docs/matomo.md).
+
 ## v1.3.0 - Optional consent decision audit log
 
 - Add optional database decision history with signed, immutable banner/dialog snapshots, resolved custom translations, and original notices from cached HTML.

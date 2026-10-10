@@ -18,6 +18,9 @@ $app['config']->set('consent.services', [
 ]);
 
 $input = json_decode(file_get_contents('php://stdin'), true, 512, JSON_THROW_ON_ERROR);
+if (array_key_exists('presets', $input)) {
+    $app['config']->set('consent.presets', $input['presets']);
+}
 $manager = $app->make(ConsentManager::class);
 $request = Request::create('/', cookies: ['consent_preferences' => $input['cookie'] ?? null]);
 
