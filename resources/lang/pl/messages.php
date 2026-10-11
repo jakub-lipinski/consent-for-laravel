@@ -29,7 +29,7 @@ return [
     'saving' => 'Zapisywanie preferencji.',
     'saved' => 'Preferencje cookies zostały zapisane.',
     'changed' => 'Preferencje cookies zmieniły się. Aktualny wybór został odświeżony.',
-    'save_failed' => 'Nie udało się zapisać preferencji. Sprawdź, czy ta strona może zapisywać cookies, i spróbuj ponownie. Opcjonalne cookies pozostają zablokowane.',
+    'save_failed' => 'Nie udało się zapisać preferencji. Spróbuj ponownie.',
     'leave_page' => 'Nie można zapamiętać Twojego wyboru. Zamknij tę kartę, aby zatrzymać narzędzia, które działały wcześniej.',
     'unavailable' => 'Zarządzanie preferencjami cookies jest niedostępne. Wymaga JavaScript i obsługiwanej przeglądarki.',
     'categories' => [

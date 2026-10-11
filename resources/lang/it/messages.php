@@ -29,7 +29,7 @@ return [
     'saving' => 'Salvataggio delle preferenze.',
     'saved' => 'Le tue preferenze sui cookie sono state salvate.',
     'changed' => 'Le tue preferenze sui cookie sono cambiate. La selezione attuale è stata aggiornata.',
-    'save_failed' => 'Non è stato possibile salvare le preferenze. Verifica se questo sito può memorizzare cookie e riprova. I cookie facoltativi restano bloccati.',
+    'save_failed' => 'Non è stato possibile salvare le preferenze. Riprova.',
     'leave_page' => 'Non è stato possibile memorizzare la tua scelta. Chiudi questa scheda per interrompere gli strumenti già in esecuzione.',
     'unavailable' => 'Le preferenze sui cookie non sono disponibili. Richiedono JavaScript e un browser compatibile.',
     'categories' => [

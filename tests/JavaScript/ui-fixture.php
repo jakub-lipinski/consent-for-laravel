@@ -15,6 +15,10 @@ $app['config']->set('consent.services', $input['services'] ?? [
     'ads' => ['category' => 'marketing', 'name' => 'Campaigns', 'description' => 'Measure conversions.'],
 ]);
 $app['config']->set('consent.ui', $input['ui'] ?? []);
+if ($input['audit'] ?? false) {
+    $app['config']->set('consent.audit.enabled', true);
+    $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
+}
 $app->setLocale($input['locale'] ?? 'en');
 echo json_encode([
     'head' => Blade::render('<x-consent::head />'),

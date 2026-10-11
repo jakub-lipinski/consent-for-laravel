@@ -224,6 +224,54 @@ test('storage failures keep a retryable interface and never present a saved succ
     assert.equal(p.button('accept').hasAttribute('aria-disabled'), false);
 });
 
+for (const variant of ['standard', 'compact']) {
+    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt']) {
+        test(`failed audit in ${variant} ${locale} keeps old grants and displays a neutral retryable error`, async t => {
+            let available = false;
+            const requests = [];
+            const p = await page(t, { input: { audit: true, locale, ui: { variant } }, decided: true, choices: { analytics: true },
+                before(window) {
+                    window.fetch = async (url, options) => {
+                        const body = JSON.parse(options.body);
+                        requests.push(body);
+                        return { ok: available, status: available ? 201 : 503, json: async () => ({ id: body.id }) };
+                    };
+                } });
+            const originalCookie = p.window.document.cookie;
+            p.launcher.click();
+            p.field('marketing').click();
+            p.button('save', true).click();
+            await idle(p);
+            assert.equal(requests.length, 2);
+            assert.equal(requests[0].id, requests[1].id);
+            assert.equal(p.api.allowed('analytics'), true);
+            assert.equal(p.api.allowed('marketing'), false);
+            assert.equal(p.window.document.cookie, originalCookie);
+            assert.equal(p.dialog.open, true);
+            const alert = p.dialog.querySelector('[role="alert"]');
+            assert.equal(alert.hidden, false);
+            assert.equal(alert.textContent, p.root.dataset.messageError);
+            assert.notEqual(alert.textContent.trim(), '');
+            // An audit outage does not imply cookie storage failure or revocation of existing grants.
+            assert.doesNotMatch(alert.textContent, /cookie/i);
+            assert.equal(p.root.querySelector('[role="status"]').textContent, '');
+            assert.equal(p.root.hasAttribute('aria-busy'), false);
+            assert.equal(p.button('save', true).hasAttribute('aria-disabled'), false);
+            assert.equal(p.field('marketing').disabled, false);
+            assert.equal(p.field('marketing').checked, true);
+            assert.equal(p.errors.filter(error => error.code === 'audit').length, 1);
+            available = true;
+            p.button('save', true).click();
+            await idle(p);
+            assert.equal(p.api.allowed('analytics'), true);
+            assert.equal(p.api.allowed('marketing'), true);
+            assert.equal(p.dialog.open, false);
+            assert.equal(alert.hidden, true);
+            assert.equal(p.root.querySelector('[role="status"]').textContent, p.root.dataset.messageSaved);
+        });
+    }
+}
+
 test('rapid double activation writes a single decision', async t => {
     let writes = 0;
     const p = await page(t, { before(window) {

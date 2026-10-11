@@ -29,7 +29,7 @@ return [
     'saving' => 'Ihre Einstellungen werden gespeichert.',
     'saved' => 'Ihre Cookie-Einstellungen wurden gespeichert.',
     'changed' => 'Ihre Cookie-Einstellungen haben sich geändert. Die aktuelle Auswahl wurde aktualisiert.',
-    'save_failed' => 'Ihre Einstellungen konnten nicht gespeichert werden. Prüfen Sie, ob diese Website Cookies speichern kann, und versuchen Sie es erneut. Optionale Cookies bleiben blockiert.',
+    'save_failed' => 'Ihre Einstellungen konnten nicht gespeichert werden. Bitte versuchen Sie es erneut.',
     'leave_page' => 'Ihre Auswahl konnte nicht gespeichert werden. Schließen Sie diesen Tab, um bereits laufende Tools zu stoppen.',
     'unavailable' => 'Cookie-Einstellungen sind nicht verfügbar. Sie erfordern JavaScript und einen unterstützten Browser.',
     'categories' => [

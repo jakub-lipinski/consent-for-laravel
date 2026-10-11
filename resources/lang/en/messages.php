@@ -29,7 +29,7 @@ return [
     'saving' => 'Saving your preferences.',
     'saved' => 'Your cookie preferences have been saved.',
     'changed' => 'Your cookie preferences changed. The current selection has been refreshed.',
-    'save_failed' => 'Your preferences could not be saved. Check whether this website can store cookies, then try again. Optional cookies remain blocked.',
+    'save_failed' => 'Your preferences could not be saved. Please try again.',
     'leave_page' => 'Your choice could not be remembered. Close this tab to stop tools that were already running.',
     'unavailable' => 'Cookie preferences are unavailable. They require JavaScript and a supported browser.',
     'categories' => [
