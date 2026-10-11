@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.4.0 - Matomo, TikTok Pixel, and Laravel Boost
 
 - Add discoverable Laravel Boost guidelines and a `consent-for-laravel-development` skill with twelve focused references covering setup, interface, scripts, browser/PHP APIs, auditing, all built-in integrations, and verification. See the [Boost guide](docs/boost.md).
 - Add a disabled-by-default TikTok Pixel preset with strict marketing consent, an initial page view, seven translated purposes, and first-party cookie cleanup.
@@ -8,6 +8,7 @@
 - Add a disabled-by-default Matomo preset for Cloud and self-hosted instances, with strict analytics consent, automatic page views/outlinks/downloads, seven translated purpose descriptions, and site-specific cookie cleanup.
 - Add guarded Matomo helpers for events, goals, searches, links, SPA page views, and e-commerce carts/orders. Denied events are discarded; active withdrawal signals denial before listeners and requires reload.
 - Validate and fingerprint Matomo destinations, options, purposes, and cookie scopes without changing existing decisions when the preset is disabled. See the [Matomo guide](docs/matomo.md).
+- See [release notes](docs/releases/v1.4.0.md).
 
 ## v1.3.0 - Optional consent decision audit log
 
