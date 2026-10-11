@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.4.1 - Bug fixes and runtime stability
+
+- Stop changed consent blocks from executing under their previously discovered category, including mutations during external loading.
+- Preserve mixed audited choices across active-withdrawal reloads. Resume the same event and enable new grants only after a matching durable receipt; newer choices and failed or expired recovery remain protected.
+- Start waiting blocks in current DOM order, including fragments inserted or moved during an earlier load.
+- Skip detached waiting templates and stop the remaining scripts of detached active blocks while retaining deduplication and revocation history.
+- Correct save-failure messages in all seven languages so an audit outage does not imply cookie-storage failure or withdrawal of earlier valid permissions.
+- Existing APIs, configuration, cookie schema, service fingerprints, and saved-decision lifetimes remain compatible. Refresh published runtime assets and merge the updated `save_failed` text into application-owned dictionaries.
+- See [release notes](docs/releases/v1.4.1.md).
+
 ## v1.4.0 - Matomo, TikTok Pixel, and Laravel Boost
 
 - Add discoverable Laravel Boost guidelines and a `consent-for-laravel-development` skill with twelve focused references covering setup, interface, scripts, browser/PHP APIs, auditing, all built-in integrations, and verification. See the [Boost guide](docs/boost.md).
