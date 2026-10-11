@@ -276,6 +276,167 @@ test('new SPA fragments obey current choices and existing block identities', asy
     assert.deepEqual(plain(p.window.order), ['dynamic']);
 });
 
+test('a prepended dependency runs before previously discovered initialization', async t => {
+    const p = await page(t, { html: block('init', 'analytics', inline('order.push(window.libraryReady ? "init" : "missing-library")')),
+        files: { '/library.js': 'window.libraryReady = true; order.push("library")' } });
+    p.window.document.body.insertAdjacentHTML('afterbegin', block('library', 'analytics', '<script src="/library.js"></script>'));
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['library', 'init']);
+    assert.deepEqual(p.loader.requests, ['/library.js']);
+});
+
+test('moving already discovered waiting blocks changes their activation order', async t => {
+    const p = await page(t, { html: block('a', 'analytics', inline('order.push("a")'))
+        + block('b', 'analytics', inline('order.push("b")')) });
+    const [a, b] = p.window.document.querySelectorAll('template');
+    a.before(b);
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['b', 'a']);
+});
+
+test('the next block follows current DOM order after an asynchronous script chain', async t => {
+    const p = await page(t, { html: block('active', 'analytics', '<script src="/slow.js"></script>' + inline('order.push("active-init")'))
+        + block('a', 'analytics', inline('order.push("a")')) + block('b', 'analytics', inline('order.push("b")')),
+        files: { '/slow.js': { body: 'order.push("slow")', delay: 40 } } });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    const a = p.window.document.querySelector('template[data-consent-block="a"]');
+    a.before(p.window.document.querySelector('template[data-consent-block="b"]'));
+    a.insertAdjacentHTML('beforebegin', block('new', 'analytics', inline('order.push("new")')));
+    await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['slow', 'active-init', 'b', 'new', 'a']);
+});
+
+test('a detached waiting block never requests its resource after a grant', async t => {
+    const p = await page(t, { html: block('old', 'analytics', '<script src="/old.js"></script>' + inline('order.push("old-init")')),
+        files: { '/old.js': 'order.push("old")' } });
+    p.window.document.querySelector('template').remove();
+    p.window.document.body.insertAdjacentHTML('beforeend', block('new', 'analytics', inline('order.push("new")')));
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(plain(p.window.order), ['new']);
+    assert.deepEqual(p.errors, []);
+});
+
+test('a block removed while another block loads is skipped without a new DOM insertion', async t => {
+    const p = await page(t, { html: block('active', 'analytics', '<script src="/slow.js"></script>')
+        + block('old', 'analytics', '<script src="/old.js"></script>') + block('healthy', 'analytics', inline('order.push("healthy")')),
+        files: { '/slow.js': { body: 'order.push("slow")', delay: 40 }, '/old.js': 'order.push("old")' } });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    p.window.document.querySelector('template[data-consent-block="old"]').remove();
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/slow.js']);
+    assert.deepEqual(plain(p.window.order), ['slow', 'healthy']);
+});
+
+test('detaching an active block stops its remaining scripts and preserves revocation tracking', async t => {
+    const p = await page(t, { html: block('active', 'analytics', '<script src="/slow.js"></script>'
+        + '<script src="/dependent.js"></script>' + inline('order.push("init")'))
+        + block('healthy', 'analytics', inline('order.push("healthy")')),
+        files: { '/slow.js': { body: 'order.push("slow")', delay: 40 }, '/dependent.js': 'order.push("dependent")' } });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    const template = p.window.document.querySelector('template');
+    template.remove();
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/slow.js']);
+    assert.deepEqual(plain(p.window.order), ['slow', 'healthy']);
+    p.window.document.body.append(template);
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/slow.js']);
+    await p.api.rejectOptional();
+    assert(p.reloads.some(event => event.reason === 'revocation'));
+});
+
+test('a script removing its own block prevents later scripts in that block', async t => {
+    const p = await page(t, { html: block('self', 'analytics', inline('order.push("first"); document.querySelector("template").remove()')
+        + inline('order.push("must-not-run")')) + block('healthy', 'analytics', inline('order.push("healthy")')) });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['first', 'healthy']);
+});
+
+test('an identical replacement of an unstarted detached block runs at its current position once', async t => {
+    const markup = block('replace', 'analytics', inline('order.push("replace")'));
+    const p = await page(t, { html: markup + block('before', 'analytics', inline('order.push("before")')) });
+    p.window.document.querySelector('template').remove();
+    p.window.document.body.insertAdjacentHTML('beforeend', markup);
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['before', 'replace']);
+    p.window.document.querySelector('template[data-consent-block="replace"]').remove();
+    p.window.document.body.insertAdjacentHTML('beforeend', markup);
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['before', 'replace']);
+    assert.deepEqual(p.errors, []);
+});
+
+test('replacing a detached block with conflicting content cannot reuse its identity', async t => {
+    const p = await page(t, { html: block('same', 'analytics', inline('order.push("original")')) });
+    p.window.document.querySelector('template').remove();
+    p.window.document.body.insertAdjacentHTML('beforeend', block('same', 'analytics', inline('order.push("conflict")')));
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    assert(p.errors.some(error => error.code === 'duplicate'));
+});
+
+test('reattaching an unchanged unstarted template retains its original identity', async t => {
+    const p = await page(t, { html: block('same', 'analytics', inline('order.push("same")')) });
+    const template = p.window.document.querySelector('template');
+    template.remove();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    p.window.document.body.append(template);
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['same']);
+});
+
+test('an identical replacement cannot revive a mutated detached block', async t => {
+    const markup = block('same', 'analytics', inline('order.push("original")'));
+    const p = await page(t, { html: markup });
+    const template = p.window.document.querySelector('template');
+    template.remove();
+    template.dataset.consentCategory = 'marketing';
+    p.window.document.body.insertAdjacentHTML('beforeend', markup);
+    await delay(0); await p.api.whenIdle();
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    assert(p.errors.some(error => error.code === 'duplicate'));
+});
+
+test('a foreign SVG template cannot replace a detached HTML block', async t => {
+    const markup = inline('order.push("original")');
+    const p = await page(t, { html: block('same', 'analytics', markup) });
+    p.window.document.querySelector('template').remove();
+    p.window.document.body.insertAdjacentHTML('beforeend', `<svg><template data-consent-block="same" data-consent-category="analytics">${markup}</template></svg>`);
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    assert.deepEqual(p.loader.requests, []);
+});
+
+test('a waiting template adopted into another document cannot activate in its old document', async t => {
+    const p = await page(t, { html: block('foreign', 'analytics', inline('order.push("foreign")')) });
+    const other = new JSDOM('<!doctype html><body></body>');
+    t.after(() => other.window.close());
+    const template = other.window.document.adoptNode(p.window.document.querySelector('template'));
+    other.window.document.body.append(template);
+    assert.equal(template.isConnected, true);
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+});
+
+test('a denied earlier block does not delay a connected allowed category', async t => {
+    const p = await page(t, { html: block('ads', 'marketing', inline('order.push("ads")'))
+        + block('stats', 'analytics', inline('order.push("stats")')) });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['stats']);
+});
+
 test('mutating an existing waiting block cannot run marketing under its original analytics permission', async t => {
     const p = await page(t, {
         html: block('mutable', 'analytics', inline('order.push("original")')),

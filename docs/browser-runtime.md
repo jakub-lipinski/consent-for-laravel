@@ -117,6 +117,8 @@ A MutationObserver discovers new templates after page navigation or fragment ins
 
 An already discovered template must keep its ID, category, and script content unchanged. Changing it stops that block's remaining script chain with a conflict diagnostic, including changes made while an external script is loading. Give a different logical block its own stable ID instead of mutating an existing block.
 
+Before starting each block, the loader uses the current document order, including fragments inserted or moved during an earlier load. A running block keeps its internal script order. Detached templates do not activate, and detaching an active template prevents its remaining scripts from starting; it cannot stop code already running or loading. An unchanged, unstarted block can be reattached or replaced by an identical template with the same ID. Started blocks retain their deduplication and revocation history even after removal.
+
 Blocks require dependencies to appear before their initialization. A denied block does not delay an independent allowed category. Avoid placing shared libraries under incompatible consent purposes. The loader does not intercept vendor requests, restart previously failed blocks, implement router lifecycle cleanup, or support arbitrary HTML insertion.
 
 ## CSP, caching, and cookie cleanup

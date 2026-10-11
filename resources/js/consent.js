@@ -552,31 +552,41 @@
         return false;
     }
 
+    const attachedBlock = record => document.documentElement?.contains(record.template) === true;
+
     function scan() {
+        const ordered = [];
         for (const template of document.querySelectorAll(selector)) {
             const id = template.getAttribute('data-consent-block');
             const category = template.getAttribute('data-consent-category');
             const signature = `${category}\n${template.innerHTML}`;
             if (records.has(id)) {
-                if (records.get(id).template === template) validBlock(records.get(id));
-                if (records.get(id).signature !== signature && !template.hasAttribute('data-consent-conflict')) {
+                const record = records.get(id);
+                if (record.template === template) validBlock(record);
+                else if (!attachedBlock(record) && record.status === 'waiting' && !record.started
+                    && template.content?.nodeType === 11 && record.signature === signature && validBlock(record)) record.template = template;
+                if (record.signature !== signature && !template.hasAttribute('data-consent-conflict')) {
                     template.setAttribute('data-consent-conflict', '');
                     report('duplicate', new Error('Consent block IDs must identify identical scripts and categories.'), id);
                 }
+                if (record.template === template) ordered.push(record);
                 continue;
             }
             if (!id || !knownCategories.includes(category) || template.content?.nodeType !== 11) {
                 report('block', new Error('Invalid consent script block.'), id);
                 continue;
             }
-            records.set(id, { id, category, signature, template, content: template.content.cloneNode(true),
-                status: 'waiting', started: false, nodes: [], cancels: new Set() });
+            const record = { id, category, signature, template, content: template.content.cloneNode(true),
+                status: 'waiting', started: false, nodes: [], cancels: new Set() };
+            records.set(id, record);
+            ordered.push(record);
         }
+        return ordered;
     }
 
     async function execute(original, record) {
         sync();
-        if (record.template && (record.status === 'failed' || !validBlock(record))) return false;
+        if (record.template && (!attachedBlock(record) || record.status === 'failed' || !validBlock(record))) return false;
         if (!canRun(record.category)) return false;
         const type = (original.getAttribute('type') ?? '').trim().toLowerCase();
         const executable = ['', 'text/javascript', 'application/javascript', 'module'].includes(type);
@@ -689,10 +699,12 @@
 
     async function drain() {
         if (!ready || reloading) return;
-        scan();
-        for (const record of records.values()) {
+        while (!reloading) {
             sync();
-            if (record.status !== 'waiting' || !validBlock(record) || !canRun(record.category)) continue;
+            // Async loading can add, move, or remove blocks. Select from the current DOM each time.
+            const record = scan().find(record => record.status === 'waiting' && attachedBlock(record)
+                && validBlock(record) && canRun(record.category));
+            if (!record) break;
             record.status = 'loading';
             try {
                 // Private copies cannot retain a mutated node after identical markup replaces the live template.
@@ -702,7 +714,7 @@
                 for (const original of children.filter(node => node.nodeType === 1)) {
                     if (!await execute(original, record)) break;
                 }
-                if (record.status === 'loading') record.status = canRun(record.category) ? 'loaded' : 'stopped';
+                if (record.status === 'loading') record.status = attachedBlock(record) && canRun(record.category) ? 'loaded' : 'stopped';
             } catch (error) {
                 record.status = 'failed';
                 if (error.name !== 'AbortError') report('script', error, record.id);
