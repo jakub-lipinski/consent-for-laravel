@@ -81,11 +81,7 @@ For other presets or your own scripts, follow [the complete quick start](https:/
 | `matomo` | `CONSENT_MATOMO_URL`, `CONSENT_MATOMO_SITE_ID` | Analytics |
 | `tiktok_pixel` | `CONSENT_TIKTOK_PIXEL_ID` | Marketing |
 
-Google Advanced is an explicit opt-in that allows tags and cookieless pings before permission. Meta, Clarity, Matomo, and TikTok remain strictly gated. Read the [integration guides](https://consent.lipinskijakub.pl/docs/integrations), [Matomo guide](docs/matomo.md), and [TikTok guide](docs/tiktok.md) for account settings, events, CSP, cookie scopes, and withdrawal.
-
-Matomo supports Cloud and self-hosted instances. Enabling its preset automatically measures the first page view, outlinks, and downloads after analytics consent. `Consent.matomo` also provides guarded events, goals, searches, SPA page views, and e-commerce cart/order measurements. See the [complete configuration and examples](docs/matomo.md).
-
-TikTok Pixel sends an initial page view after marketing consent. `Consent.tiktok` adds guarded standard/custom events, manual SPA page views, event IDs, and optional Advanced Matching with SHA-256 hashes. See the [configuration and examples](docs/tiktok.md).
+Google Advanced is an explicit opt-in that allows tags and cookieless pings before permission. Meta, Clarity, Matomo, and TikTok remain strictly gated. The [integration guides](https://consent.lipinskijakub.pl/docs/integrations) cover automatic measurements, additional events, account settings, CSP, cookie scopes, and withdrawal, including [Matomo](https://consent.lipinskijakub.pl/docs/matomo) and [TikTok Pixel](https://consent.lipinskijakub.pl/docs/tiktok-pixel).
 
 ## Your own scripts
 
@@ -132,7 +128,7 @@ New optional grants wait for a database receipt; refusal and withdrawal take eff
 
 ## Laravel Boost
 
-The package includes discoverable guidelines and the `consent-for-laravel-development` skill. In your application, run `php artisan boost:install`, select this package, and enable guidelines and skills for your agents. Existing Boost installations can add it through `php artisan boost:update --discover`. See the [Boost guide](docs/boost.md) for installation, generated files, reference contents, and custom overrides. Boost is optional and is not a package runtime dependency.
+The package includes discoverable guidelines and the `consent-for-laravel-development` skill. In your application, run `php artisan boost:install`, select this package, and enable guidelines and skills for your agents. Existing Boost installations can add it through `php artisan boost:update --discover`. See the [Boost guide](https://consent.lipinskijakub.pl/docs/laravel-boost) for installation, generated files, reference contents, and custom overrides. Boost is optional and is not a package runtime dependency.
 
 ## Documentation and updates
 
