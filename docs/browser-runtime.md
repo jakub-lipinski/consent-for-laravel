@@ -115,6 +115,8 @@ Errors never include the saved cookie or visitor identifiers. If another library
 
 A MutationObserver discovers new templates after page navigation or fragment insertion. Use an explicit stable ID for each logical block, because generated IDs restart with each server render. An identical ID/category/content combination runs once; a conflicting combination is ignored with a diagnostic. Distinct inline blocks intentionally remain distinct. External resources share a loading promise for the same normalized URL, classic/module kind, integrity, CORS, and referrer policy.
 
+An already discovered template must keep its ID, category, and script content unchanged. Changing it stops that block's remaining script chain with a conflict diagnostic, including changes made while an external script is loading. Give a different logical block its own stable ID instead of mutating an existing block.
+
 Blocks require dependencies to appear before their initialization. A denied block does not delay an independent allowed category. Avoid placing shared libraries under incompatible consent purposes. The loader does not intercept vendor requests, restart previously failed blocks, implement router lifecycle cleanup, or support arbitrary HTML insertion.
 
 ## CSP, caching, and cookie cleanup

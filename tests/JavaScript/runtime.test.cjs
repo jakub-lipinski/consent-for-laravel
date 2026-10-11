@@ -276,6 +276,70 @@ test('new SPA fragments obey current choices and existing block identities', asy
     assert.deepEqual(plain(p.window.order), ['dynamic']);
 });
 
+test('mutating an existing waiting block cannot run marketing under its original analytics permission', async t => {
+    const p = await page(t, {
+        html: block('mutable', 'analytics', inline('order.push("original")')),
+        files: { '/marketing.js': 'order.push("marketing")' },
+    });
+    const template = p.window.document.querySelector('template');
+    template.dataset.consentCategory = 'marketing';
+    template.innerHTML = '<script src="/marketing.js"></script>';
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.deepEqual(p.loader.requests, []);
+    assert.deepEqual(plain(p.window.order), []);
+    assert.equal(p.errors.filter(error => error.code === 'duplicate').length, 1);
+    template.dataset.consentCategory = 'analytics';
+    template.innerHTML = inline('order.push("original")');
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+});
+
+test('non-HTML templates do not interrupt scanning valid inert blocks', async t => {
+    const p = await page(t, {
+        html: '<svg><template data-consent-block="foreign" data-consent-category="analytics"></template></svg>'
+            + block('stats', 'analytics', inline('order.push("stats")')),
+    });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['stats']);
+    assert(p.errors.some(error => error.code === 'block' && error.block === 'foreign'));
+    assert(!p.errors.some(error => error.code === 'loader'));
+});
+
+test('a block changed during an external load cannot execute its changed dependent script', async t => {
+    const p = await page(t, {
+        html: block('mutable', 'analytics', '<script src="/library.js"></script>' + inline('order.push("original-init")')),
+        files: { '/library.js': { body: 'order.push("library")', delay: 30 }, '/marketing.js': 'order.push("marketing")' },
+    });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    const template = p.window.document.querySelector('template');
+    template.dataset.consentCategory = 'marketing';
+    template.content.querySelectorAll('script')[1].src = '/marketing.js';
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/library.js']);
+    assert.deepEqual(plain(p.window.order), ['library']);
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.errors.filter(error => error.code === 'duplicate').length, 1);
+});
+
+test('restoring template markup during a load cannot execute a mutated detached script reference', async t => {
+    const p = await page(t, {
+        html: block('mutable', 'analytics', '<script src="/library.js"></script>' + inline('order.push("original-init")')),
+        files: { '/library.js': { body: 'order.push("library")', delay: 30 }, '/marketing.js': 'order.push("marketing")' },
+    });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    const template = p.window.document.querySelector('template');
+    const markup = template.innerHTML;
+    template.content.querySelectorAll('script')[1].src = '/marketing.js';
+    template.innerHTML = markup;
+    await p.api.whenIdle();
+    assert.deepEqual(p.loader.requests, ['/library.js']);
+    assert.deepEqual(plain(p.window.order), ['library', 'original-init']);
+    assert.equal(p.api.allowed('marketing'), false);
+});
+
 test('revoking active code saves refusal and requests a reload even after node removal', async t => {
     const p = await page(t, { html: block('stats', 'analytics', inline('order.push("stats")')) });
     await p.api.acceptAll();
@@ -1226,6 +1290,204 @@ test('mixed audit choices remove old grants immediately and delay newly granted 
     assert.equal(p.api.allowed('marketing'), true);
     await p.api.whenIdle();
 });
+
+async function interruptedMixedAudit(t, historyFallback = false) {
+    const config = configuration({ audit: auditConfig });
+    let body;
+    const p = await page(t, {
+        config, state: decision(config), html: auditNoticeHtml + block('stats', 'analytics', inline('order.push("stats")')),
+        before(window) {
+            if (historyFallback) Object.defineProperty(window, 'sessionStorage', { get() { throw new Error('Unavailable'); } });
+            window.history.replaceState({ app: 'keep' }, '');
+            window.fetch = (url, options) => { body = options.body; return new Promise(() => {}); };
+        },
+    });
+    p.api.choose({ marketing: true }).catch(() => {});
+    await delay(5);
+    assert.equal(p.reloads.length, 1);
+    assert.equal(p.api.state().choices.analytics, false);
+    assert.equal(p.api.state().choices.marketing, false);
+    const session = historyFallback ? [] : Array.from({ length: p.window.sessionStorage.length }, (_, i) => {
+        const key = p.window.sessionStorage.key(i);
+        return [key, p.window.sessionStorage.getItem(key)];
+    });
+    const history = plain(p.window.history.state);
+    p.dom.window.close();
+    return { config, jar: p.jar, body, history, before(window) {
+        if (historyFallback) Object.defineProperty(window, 'sessionStorage', { get() { throw new Error('Unavailable'); } });
+        else for (const [key, value] of session) window.sessionStorage.setItem(key, value);
+        window.history.replaceState(history, '');
+    } };
+}
+
+for (const historyFallback of [false, true]) {
+    test(`mixed audit choices survive active withdrawal reload using ${historyFallback ? 'history' : 'session storage'}`, async t => {
+        const interrupted = await interruptedMixedAudit(t, historyFallback);
+        let acknowledge;
+        const requests = [];
+        const p = await page(t, {
+            config: interrupted.config, jar: interrupted.jar, idle: false,
+            html: auditNoticeHtml.replace('signed cached notice', 'new notice') + block('ads', 'marketing', inline('order.push("marketing")')),
+            before(window) {
+                interrupted.before(window);
+                window.fetch = (url, options) => { requests.push(options.body); return new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); };
+            },
+        });
+        await delay(5);
+        assert.deepEqual(requests, [interrupted.body]);
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.api.allowed('marketing'), false);
+        assert.deepEqual(plain(p.window.order), []);
+        acknowledge(); await p.api.whenIdle();
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.api.allowed('marketing'), true);
+        assert.deepEqual(plain(p.window.order), ['marketing']);
+        assert.deepEqual(plain(p.window.history.state), { app: 'keep' });
+        if (!historyFallback) assert.equal(p.window.sessionStorage.length, 0);
+    });
+}
+
+test('a failed resumed audit never grants and clears its handoff', async t => {
+    const interrupted = await interruptedMixedAudit(t);
+    const requests = [];
+    const p = await page(t, { config: interrupted.config, jar: interrupted.jar, html: auditNoticeHtml,
+        before(window) { interrupted.before(window); window.fetch = async (url, options) => { requests.push(options.body); return auditReceipt(options, 503); }; },
+    });
+    assert.deepEqual(requests, [interrupted.body, interrupted.body]);
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.window.sessionStorage.length, 0);
+    assert.equal(p.errors.filter(error => error.code === 'audit').length, 1);
+});
+
+test('a refusal during readiness cancels recovery before its audit request is dispatched', async t => {
+    const interrupted = await interruptedMixedAudit(t);
+    const requests = [];
+    const p = await page(t, { config: interrupted.config, jar: interrupted.jar, html: auditNoticeHtml,
+        before(window) {
+            interrupted.before(window);
+            window.fetch = async (url, options) => { requests.push(JSON.parse(options.body)); return auditReceipt(options); };
+            window.document.addEventListener('consent:ready', () => { window.Consent.rejectOptional().catch(() => {}); });
+        },
+    });
+    assert.deepEqual(requests.map(request => request.action), ['reject_optional']);
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.window.sessionStorage.length, 0);
+});
+
+for (const withdrawal of [false, true]) {
+    test(`a later ${withdrawal ? 'withdrawal' : 'refusal'} supersedes a resumed audit even when its grant receipt arrives last`, async t => {
+        const interrupted = await interruptedMixedAudit(t);
+        const acknowledgements = [];
+        const p = await page(t, { config: interrupted.config, jar: interrupted.jar, idle: false,
+            html: auditNoticeHtml + block('ads', 'marketing', inline('order.push("marketing")')),
+            before(window) { interrupted.before(window); window.fetch = (url, options) => new Promise(resolve => acknowledgements.push(() => resolve(auditReceipt(options)))); },
+        });
+        await delay(5);
+        const refused = withdrawal ? p.api.forget() : p.api.rejectOptional();
+        acknowledgements[1](); acknowledgements[0]();
+        await refused; await p.api.whenIdle();
+        assert.equal(p.api.allowed('marketing'), false);
+        if (withdrawal) assert.equal(p.api.state().decidedAt, null);
+        assert.deepEqual(plain(p.window.order), []);
+        assert.equal(p.window.sessionStorage.length, 0);
+    });
+}
+
+test('resumed audit receipts cannot overwrite an external change to the saved refusal', async t => {
+    const interrupted = await interruptedMixedAudit(t);
+    let acknowledge;
+    const p = await page(t, { config: interrupted.config, jar: interrupted.jar, idle: false, html: auditNoticeHtml,
+        before(window) { interrupted.before(window); window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+    });
+    await delay(5);
+    const decidedAt = p.api.state().decidedAt - 1;
+    const refusal = decision(interrupted.config, {}, { decidedAt, expiresAt: decidedAt + interrupted.config.retentionDays * 86400 });
+    store(p.jar, refusal);
+    acknowledge(); await p.api.whenIdle();
+    assert.deepEqual(plain(p.api.state()), refusal);
+    assert.equal(p.api.allowed('marketing'), false);
+});
+
+for (const invalid of ['expired', 'changed policy', 'different choices']) {
+    test(`invalid pending audit is discarded without posting or granting: ${invalid}`, async t => {
+        const interrupted = await interruptedMixedAudit(t);
+        let requests = 0;
+        const config = invalid === 'changed policy' ? { ...interrupted.config, policyVersion: 'new-policy' } : interrupted.config;
+        const p = await page(t, { config, jar: interrupted.jar, html: auditNoticeHtml,
+            before(window) {
+                interrupted.before(window);
+                const key = Array.from({ length: window.sessionStorage.length }, (_, i) => window.sessionStorage.key(i))
+                    .find(key => key.startsWith('consent:audit-pending:'));
+                const saved = JSON.parse(window.sessionStorage.getItem(key));
+                if (invalid === 'expired') saved.deadline = 0;
+                if (invalid === 'different choices') {
+                    const body = JSON.parse(saved.body);
+                    body.choices.marketing = false;
+                    saved.body = JSON.stringify(body);
+                }
+                window.sessionStorage.setItem(key, JSON.stringify(saved));
+                window.fetch = async (url, options) => { requests++; return auditReceipt(options); };
+            },
+        });
+        assert.equal(requests, 0);
+        assert.equal(p.api.allowed('marketing'), false);
+        assert.equal(p.window.sessionStorage.length, 0);
+    });
+}
+
+test('a resumed receipt arriving after its handoff deadline cannot grant', async t => {
+    const interrupted = await interruptedMixedAudit(t);
+    let acknowledge;
+    const p = await page(t, { config: interrupted.config, jar: interrupted.jar, idle: false, html: auditNoticeHtml,
+        before(window) { interrupted.before(window); window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+    });
+    await delay(5);
+    const later = p.window.Date.now() + 10000;
+    p.window.Date.now = () => later;
+    acknowledge(); await p.api.whenIdle();
+    assert.equal(p.api.allowed('marketing'), false);
+    assert.equal(p.window.sessionStorage.length, 0);
+});
+
+test('unavailable handoff storage rejects mixed grants while immediately revoking active code', async t => {
+    const config = configuration({ audit: auditConfig });
+    let requests = 0;
+    const p = await page(t, { config, state: decision(config), html: auditNoticeHtml + block('stats', 'analytics', inline('order.push("stats")')),
+        before(window) {
+            Object.defineProperty(window, 'sessionStorage', { get() { throw new Error('Unavailable'); } });
+            window.history.replaceState('app-owned-primitive', '');
+            window.fetch = async (url, options) => { requests++; return auditReceipt(options); };
+        },
+    });
+    const saving = p.api.choose({ marketing: true });
+    assert.equal(p.api.allowed('analytics'), false);
+    await assert.rejects(saving, /remembered across reloads/);
+    assert.equal(requests, 1);
+    assert.equal(p.api.state().choices.marketing, false);
+    assert.equal(p.reloads.length, 1);
+    assert.equal(p.window.history.state, 'app-owned-primitive');
+});
+
+for (const cooperative of [false, true]) {
+    test(`mixed audited choices need no handoff storage with ${cooperative ? 'successful cooperative cleanup' : 'no active scripts'}`, async t => {
+        const config = configuration({ audit: auditConfig });
+        const p = await page(t, { config, state: decision(config),
+            html: auditNoticeHtml + (cooperative ? block('stats', 'analytics', inline('order.push("stats")')) : ''),
+            before(window) {
+                Object.defineProperty(window, 'sessionStorage', { get() { throw new Error('Unavailable'); } });
+                window.history.replaceState('app-owned-primitive', '');
+                window.fetch = async (url, options) => auditReceipt(options);
+            },
+        });
+        if (cooperative) p.api.onRevoke('analytics', () => {}, { reload: false });
+        await p.api.choose({ marketing: true }); await p.api.whenIdle();
+        assert.equal(p.api.allowed('analytics'), false);
+        assert.equal(p.api.allowed('marketing'), true);
+        assert.equal(p.reloads.length, 0);
+        assert.equal(p.window.history.state, 'app-owned-primitive');
+        assert.deepEqual(p.errors, []);
+    });
+}
 
 test('missing signed notice blocks grants and does not prevent refusal', async t => {
     const config = configuration({ audit: auditConfig });

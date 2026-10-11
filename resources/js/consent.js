@@ -162,6 +162,7 @@
     let storageFailed = rememberedDenial();
     let current = snapshot(storageFailed ? pending() : read());
     let reloading = false;
+    let pendingAudit = null;
     let ready = false;
     let markReady;
     const initialized = new Promise(resolve => { markReady = resolve; });
@@ -194,6 +195,10 @@
         if (!automatic) {
             emit('reload-required', { reason, automatic: false });
             return;
+        }
+        if (pendingAudit && !storageFailed) {
+            try { rememberAudit(pendingAudit.body, pendingAudit.next, pendingAudit.baseline); }
+            catch (error) { pendingAudit.error = error; report('audit', error); }
         }
         emit('reload-required', { reason });
         try { window.location.reload(); }
@@ -318,8 +323,77 @@
     }
 
     let auditRevision = 0;
+    const auditPendingKey = `consent:audit-pending:${denialScope}`;
 
-    async function auditDecision(action, state) {
+    function savedAudit() {
+        try {
+            const value = sessionStorage.getItem(auditPendingKey);
+            if (value !== null) return JSON.parse(value);
+        } catch {}
+        try {
+            const value = history.state?.__consentForLaravelAudit;
+            return value?.scope === denialScope ? value : null;
+        } catch { return null; }
+    }
+
+    function clearSavedAudit(body) {
+        if (body === undefined || pendingAudit?.body === body) pendingAudit = null;
+        if (body !== undefined && savedAudit()?.body !== body) return;
+        try { sessionStorage.removeItem(auditPendingKey); } catch {}
+        try {
+            if (history.state?.__consentForLaravelAudit?.scope === denialScope) {
+                const state = { ...history.state };
+                delete state.__consentForLaravelAudit;
+                history.replaceState(Object.keys(state).length ? state : null, '');
+            }
+        } catch {}
+    }
+
+    function rememberAudit(body, next, baseline) {
+        const value = { scope: denialScope, path: config.audit.path, body, next, baseline,
+            deadline: Date.now() + 2 * config.audit.timeoutMs + 5000 };
+        const serialized = JSON.stringify(value);
+        try {
+            sessionStorage.setItem(auditPendingKey, serialized);
+            if (sessionStorage.getItem(auditPendingKey) === serialized) return;
+        } catch {}
+        try {
+            const state = history.state;
+            if (state === null || typeof state === 'object' && !Array.isArray(state)) {
+                history.replaceState({ ...state, __consentForLaravelAudit: value }, '');
+                if (JSON.stringify(savedAudit()) === serialized) return;
+            }
+        } catch {}
+        throw new Error('The pending consent audit cannot be remembered across reloads.');
+    }
+
+    async function deliverAudit(body) {
+        const endpoint = new URL(config.audit.path, window.location.origin);
+        if (endpoint.origin !== window.location.origin) throw new Error('Consent audit must use the same origin.');
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), config.audit.timeoutMs);
+            try {
+                const response = await window.fetch(endpoint.href, {
+                    method: 'POST', credentials: 'same-origin', mode: 'same-origin', redirect: 'error',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body, keepalive: true, signal: controller.signal,
+                });
+                if (!response.ok) {
+                    const error = new Error(`Consent audit failed (${response.status}).`);
+                    if (response.status < 500 || attempt === 1) throw Object.assign(error, { final: true });
+                    continue;
+                }
+                const receipt = await response.json();
+                if (receipt?.id !== JSON.parse(body).id) throw Object.assign(new Error('Invalid consent audit receipt.'), { final: true });
+                return;
+            } catch (error) {
+                if (error?.final || attempt === 1) throw error;
+            } finally { clearTimeout(timer); }
+        }
+    }
+
+    async function auditDecision(action, state, prepared = () => {}) {
         if (!config.audit) return;
         try {
             const nodes = document.querySelectorAll('script[data-consent-notice]');
@@ -328,33 +402,40 @@
             if (typeof notice?.payload !== 'string' || typeof notice.signature !== 'string') throw new Error('Invalid signed consent notice.');
             const body = JSON.stringify({ id: window.crypto.randomUUID(), notice, action, choices: state.choices });
             if (new TextEncoder().encode(body).byteLength > 61440) throw new Error('Consent audit request exceeds 60 KiB.');
-            const endpoint = new URL(config.audit.path, window.location.origin);
-            if (endpoint.origin !== window.location.origin) throw new Error('Consent audit must use the same origin.');
-            for (let attempt = 0; attempt < 2; attempt++) {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), config.audit.timeoutMs);
-                try {
-                    const response = await window.fetch(endpoint.href, {
-                        method: 'POST', credentials: 'same-origin', mode: 'same-origin', redirect: 'error',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                        body, keepalive: true, signal: controller.signal,
-                    });
-                    if (!response.ok) {
-                        const error = new Error(`Consent audit failed (${response.status}).`);
-                        if (response.status < 500 || attempt === 1) throw Object.assign(error, { final: true });
-                        continue;
-                    }
-                    const receipt = await response.json();
-                    if (receipt?.id !== JSON.parse(body).id) throw Object.assign(new Error('Invalid consent audit receipt.'), { final: true });
-                    return;
-                } catch (error) {
-                    if (error?.final || attempt === 1) throw error;
-                } finally { clearTimeout(timer); }
-            }
+            prepared(body);
+            await deliverAudit(body);
         } catch (error) {
             report('audit', error);
             throw error;
         }
+    }
+
+    function resumeAudit() {
+        const saved = savedAudit();
+        if (saved === null) return;
+        const matches = () => !storageFailed && validDecision(saved.next) && validDecision(saved.baseline)
+            && saved.deadline >= Date.now() && JSON.stringify(read()) === JSON.stringify(saved.baseline);
+        try {
+            if (!config.audit || saved.scope !== denialScope || saved.path !== config.audit.path
+                || !Number.isSafeInteger(saved.deadline) || typeof saved.body !== 'string'
+                || new TextEncoder().encode(saved.body).byteLength > 61440 || !matches()
+                || JSON.stringify(JSON.parse(saved.body).choices) !== JSON.stringify(saved.next.choices)) {
+                clearSavedAudit();
+                return;
+            }
+        } catch { clearSavedAudit(); return; }
+        const revision = ++auditRevision;
+        const canResume = () => revision === auditRevision && !reloading && savedAudit()?.body === saved.body && matches();
+        // Replay the same explicit decision/ID, never a new decision based on a cookie read.
+        operation(async () => {
+            try {
+                if (!canResume()) return;
+                await deliverAudit(saved.body);
+                sync();
+                if (canResume()) persistLocal(saved.next, 'choice');
+            } catch (error) { report('audit', error); }
+            finally { clearSavedAudit(saved.body); }
+        });
     }
 
     function persistLocal(next, source) {
@@ -370,7 +451,7 @@
     }
 
     function choose(choices, action = 'save_preferences') {
-        let next, revision, audit;
+        let next, revision, audit, body, recovery;
         try {
             if (reloading) throw new Error('A consent reload is in progress.');
             if (!choices || Object.prototype.toString.call(choices) !== '[object Object]') throw new TypeError('Consent choices must be an object.');
@@ -383,36 +464,47 @@
             }
             const decidedAt = now();
             next = { ...pending(), choices: normalized, decidedAt, expiresAt: decidedAt + config.retentionDays * 86400 };
+            clearSavedAudit();
             revision = ++auditRevision;
             if (config.audit) {
-                // Start keepalive delivery before cleanup can trigger a reload.
-                audit = auditDecision(action, next);
-                // Observe eager failures even while another operation is awaiting its receipt.
-                audit.catch(() => {});
                 const reduced = { ...next, choices: Object.fromEntries(knownCategories.map(key =>
                     [key, key === 'necessary' || normalized[key] && permits(current, key)])) };
+                const removes = knownCategories.some(key => key !== 'necessary' && current.choices[key] && !normalized[key]);
+                const adds = knownCategories.some(key => key !== 'necessary' && normalized[key] && !permits(current, key));
+                // Start keepalive delivery before cleanup can trigger a reload.
+                audit = auditDecision(action, next, prepared => {
+                    body = prepared;
+                    if (removes && adds) recovery = pendingAudit = { body, next, baseline: reduced };
+                });
+                // Observe eager failures even while another operation is awaiting its receipt.
+                audit.catch(() => {});
                 // New grants wait for a receipt. Removals take effect immediately,
                 // including when a previous grant is still waiting on the network.
-                if (knownCategories.some(key => key !== 'necessary' && current.choices[key] && !normalized[key])
-                    || !knownCategories.some(key => key !== 'necessary' && normalized[key])) persistLocal(reduced, 'choice');
+                if (removes || !knownCategories.some(key => key !== 'necessary' && normalized[key])) persistLocal(reduced, 'choice');
             }
-        } catch (error) { return Promise.reject(error); }
+        } catch (error) {
+            if (body !== undefined) clearSavedAudit(body);
+            return Promise.reject(error);
+        }
         return operation(async () => {
             try {
                 if (audit) await audit;
                 if (config.audit && revision !== auditRevision) return snapshot(current);
+                if (recovery?.error) throw recovery.error;
+                if (pendingAudit?.body === body) pendingAudit = null;
                 persistLocal(next, 'choice');
                 await cleanupQueue;
                 return snapshot(current);
             } catch (error) {
                 await cleanupQueue;
                 throw error;
-            }
+            } finally { if (body !== undefined) clearSavedAudit(body); }
         });
     }
 
     function forget() {
         let audit;
+        clearSavedAudit();
         const revision = ++auditRevision;
         const remove = () => {
             try {
@@ -448,25 +540,43 @@
         });
     }
 
+    function validBlock(record) {
+        const template = record.template;
+        if (template.getAttribute('data-consent-block') === record.id
+            && `${template.getAttribute('data-consent-category')}\n${template.innerHTML}` === record.signature) return true;
+        record.status = 'failed';
+        if (!template.hasAttribute('data-consent-conflict')) {
+            template.setAttribute('data-consent-conflict', '');
+            report('duplicate', new Error('Consent block IDs must identify identical scripts and categories.'), record.id);
+        }
+        return false;
+    }
+
     function scan() {
         for (const template of document.querySelectorAll(selector)) {
             const id = template.getAttribute('data-consent-block');
             const category = template.getAttribute('data-consent-category');
             const signature = `${category}\n${template.innerHTML}`;
             if (records.has(id)) {
+                if (records.get(id).template === template) validBlock(records.get(id));
                 if (records.get(id).signature !== signature && !template.hasAttribute('data-consent-conflict')) {
                     template.setAttribute('data-consent-conflict', '');
                     report('duplicate', new Error('Consent block IDs must identify identical scripts and categories.'), id);
                 }
                 continue;
             }
-            if (!id || !knownCategories.includes(category)) { report('block', new Error('Invalid consent script block.'), id); continue; }
-            records.set(id, { id, category, signature, template, status: 'waiting', started: false, nodes: [], cancels: new Set() });
+            if (!id || !knownCategories.includes(category) || template.content?.nodeType !== 11) {
+                report('block', new Error('Invalid consent script block.'), id);
+                continue;
+            }
+            records.set(id, { id, category, signature, template, content: template.content.cloneNode(true),
+                status: 'waiting', started: false, nodes: [], cancels: new Set() });
         }
     }
 
     async function execute(original, record) {
         sync();
+        if (record.template && (record.status === 'failed' || !validBlock(record))) return false;
         if (!canRun(record.category)) return false;
         const type = (original.getAttribute('type') ?? '').trim().toLowerCase();
         const executable = ['', 'text/javascript', 'application/javascript', 'module'].includes(type);
@@ -500,7 +610,7 @@
         if (executable) record.started = true;
         const waits = url !== null || type === 'module';
         const retryKey = `consent:script-timeout:${JSON.stringify([denialScope, config.policyVersion, config.servicesVersion,
-            record.id, record.template ? [...record.template.content.children].indexOf(original) : 'preset'])}`;
+            record.id, record.template ? [...record.content.children].indexOf(original) : 'preset'])}`;
         const result = new Promise((resolve, reject) => {
             let settled = false;
             let timer = null;
@@ -582,16 +692,17 @@
         scan();
         for (const record of records.values()) {
             sync();
-            if (record.status !== 'waiting' || !canRun(record.category)) continue;
+            if (record.status !== 'waiting' || !validBlock(record) || !canRun(record.category)) continue;
             record.status = 'loading';
             try {
-                const children = [...record.template.content.childNodes];
+                // Private copies cannot retain a mutated node after identical markup replaces the live template.
+                const children = [...record.content.childNodes];
                 if (children.some(node => node.nodeType !== 8 && !(node.nodeType === 3 && node.textContent.trim() === '')
                     && !(node.nodeType === 1 && node.tagName === 'SCRIPT'))) throw new Error('Consent blocks support only script elements, whitespace, and comments.');
                 for (const original of children.filter(node => node.nodeType === 1)) {
                     if (!await execute(original, record)) break;
                 }
-                record.status = canRun(record.category) ? 'loaded' : 'stopped';
+                if (record.status === 'loading') record.status = canRun(record.category) ? 'loaded' : 'stopped';
             } catch (error) {
                 record.status = 'failed';
                 if (error.name !== 'AbortError') report('script', error, record.id);
@@ -1216,6 +1327,7 @@
     window.Consent = Object.freeze(api);
     function start() {
         ready = true;
+        resumeAudit();
         cleanCookies(knownCategories.filter(key => key !== 'necessary' && !permits(current, key)));
         schedule();
         new MutationObserver(changes => {
