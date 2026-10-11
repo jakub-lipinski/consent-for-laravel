@@ -36,6 +36,10 @@ The URL/API are illustrative; adapt both to the provider. The directive renders 
 
 Scripts run in document order after permission, with libraries finishing before initialization. Each block runs once per document; duplicate external sources are shared according to the loader's resource key. `async`/`defer` are removed; integrity, crossorigin, referrerpolicy, and nonce are preserved. JSON/data scripts remain inert; they cannot have `src`.
 
+Keep a discovered template's ID, category, and script content unchanged, including during external loading. A mutation stops its remaining chain with a conflict diagnostic. Use a distinct stable ID for a different logical block, and the same ID/category/content when rendering the same block again.
+
+Waiting blocks start in current DOM order, including fragments inserted or moved during an earlier load. Detached templates cannot activate; detaching an active template prevents its remaining scripts from starting. An unchanged unstarted block can be reattached or replaced by an identical template. Started blocks retain deduplication and revocation history, and removal cannot stop code already running or loading.
+
 ### Modules and Events
 
 A gated module may await an enabled preset helper:

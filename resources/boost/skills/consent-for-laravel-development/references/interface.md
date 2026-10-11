@@ -33,6 +33,8 @@ Use an ordinary button to reopen the native preferences dialog:
 
 Opening preferences grants nothing. The initial banner is a section; preferences use a native modal dialog. Keep equal acceptance/refusal prominence, category purposes, full service descriptions, accessible controls, status/error announcements, focus management, and a readily available reopening action when customizing views. Closing the banner or an unsaved dialog does not record a decision.
 
+Preserve a visible retryable alert after a failed save. Merge the current `save_failed` wording into application-owned dictionaries: an audit failure can leave earlier grants active, so the generic error must not claim that all optional cookies are blocked or assume cookie-storage failure. Keep any attempted selection available for retry without treating it as saved permission.
+
 ### Translations
 
 Bundled locales are `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt`. Null locale follows the application; regional locales fall back to their parent and then English per key. Custom locales can use the same dictionary structure.

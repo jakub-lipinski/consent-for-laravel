@@ -32,6 +32,10 @@ The built-in runtime records `acceptAll()`, `rejectOptional()`, `choose()`, and 
 
 New optional grants wait for a matching durable database receipt. Refusal/withdrawal deny locally immediately, including during delivery failure. Later denial supersedes pending acceptance; a delayed acceptance receipt cannot restore permission. Promise rejection reports a delivery failure and does not reverse local denial. Browser preference writes and audit delivery are distinct operations.
 
+When active withdrawal reloads a mixed change, the runtime carries the original event UUID, signed notice, and choices through a short-lived same-tab handoff. The next document retries the same event and enables new grants only after a matching receipt while the saved refusal and configuration still match. Session storage has an object-valued history-state fallback. A newer choice, failed receipt, or expired handoff discards recovery; unavailable handoff storage leaves the new grant denied. This is not an offline queue, and ordinary decisions without a required reload need no handoff.
+
+An audit failure does not necessarily revoke earlier valid permissions. For example, adding marketing to an existing analytics grant can fail while analytics remains allowed. Keep custom save errors neutral and retryable; do not claim that every optional cookie is blocked or that cookie storage caused an audit failure.
+
 The endpoint is registered by the package when audit is enabled at boot. It has an exact same-origin/signed-JSON contract without web/session middleware; no application CSRF exemption or CORS configuration is needed. Keep session/CSRF encryption, allow `connect-src 'self'`, and preserve the head/banner's original `data-consent-notice` block when customizing/publishing views and assets.
 
 ### Retention

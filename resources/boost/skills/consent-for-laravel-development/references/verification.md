@@ -41,6 +41,9 @@ Run the applicable scenarios in a disposable application/test browser:
 | Loader timeout | Activation halts; bounded reload recovery prevents repeated automatic loops |
 | Enabled audit with delayed receipt | A new grant waits for durable acknowledgement |
 | Failed audit or late acceptance receipt after refusal | No new grant is revived; local denial remains |
+| Mixed audited change with active withdrawal reload | Immediate denial; same event retried without duplicate rows; new grant waits for receipt |
+| Changed, moved, or detached waiting blocks | Mutations stop activation; connected blocks follow current DOM order; detached blocks make no requests |
+| Failed audit when adding a category to an existing grant | Earlier permission can remain active; new permission stays denied; UI error remains neutral and retryable |
 
 Google Advanced intentionally allows enabled Google tags/cookieless pings in pending/refused states; keep that exception separate from strictly gated integrations. Clarity advertising also depends on its explicit configuration. Do not claim a universal zero-request result for Advanced.
 
