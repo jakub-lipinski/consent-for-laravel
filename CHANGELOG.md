@@ -8,7 +8,7 @@
 - Protect Livewire 4 single-file gated scripts before extraction, and provide stable template keys without requiring Livewire in production dependencies.
 - Validate destination runtime/asset context, preserve storage-denial/audit recovery across history writes, and keep full active-withdrawal reloads.
 - Add `consent:navigated` for explicitly managed SPA measurements, optional Livewire settings, browser/real-framework tests, CI and Boost guidance. No automatic analytics page views are added.
-- See the [Livewire guide](docs/livewire.md) and [upgrade instructions](https://consent.lipinskijakub.pl/docs/upgrading#livewire-and-language-update).
+- See the [release notes](docs/releases/v1.5.0.md), [Livewire guide](docs/livewire.md), and [upgrade instructions](https://consent.lipinskijakub.pl/docs/upgrading#livewire-and-language-update).
 
 ## v1.4.1 - Bug fixes and runtime stability
 
