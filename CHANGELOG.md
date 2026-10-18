@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.5.0 - Livewire and more languages
 
 - Add complete Czech (`cs`) and Dutch (`nl`) interfaces, including preset purposes, accessible labels, status/error messages and audit notices, with regional fallback and Livewire language switching.
 - Add optional Livewire 3/4 lifecycle coordination for navigation, redirects, history, morphs and dynamic components, preserving ordered and deduplicated consent gates.
@@ -8,7 +8,7 @@
 - Protect Livewire 4 single-file gated scripts before extraction, and provide stable template keys without requiring Livewire in production dependencies.
 - Validate destination runtime/asset context, preserve storage-denial/audit recovery across history writes, and keep full active-withdrawal reloads.
 - Add `consent:navigated` for explicitly managed SPA measurements, optional Livewire settings, browser/real-framework tests, CI and Boost guidance. No automatic analytics page views are added.
-- See the [Livewire guide](docs/livewire.md). No version bump or release tag is included.
+- See the [Livewire guide](docs/livewire.md) and [upgrade instructions](https://consent.lipinskijakub.pl/docs/upgrading#livewire-and-language-update).
 
 ## v1.4.1 - Bug fixes and runtime stability
 

@@ -3,7 +3,8 @@ name: consent-for-laravel-development
 description: >-
   Configure and use Consent for Laravel in Laravel applications. Activate when
   working with this package's consent interface, tracking presets, guarded events,
-  custom scripts, consent withdrawal, translations, or decision auditing.
+  custom scripts, Livewire navigation, consent withdrawal, translations, or
+  decision auditing.
 license: MIT
 metadata:
   author: jakub-lipinski

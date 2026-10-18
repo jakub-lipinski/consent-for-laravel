@@ -1,6 +1,6 @@
 # Livewire
 
-Livewire support is implemented on the development branch and currently unreleased. Supported baselines are Livewire 3.8.10+ and 4.4.7+, with Laravel 12–13 and PHP 8.3+. Applications without Livewire keep the same framework-free runtime and need no new frontend dependency, build, database migration or endpoint.
+Livewire support is optional. Supported baselines are Livewire 3.8.10+ and 4.4.7+, with Laravel 12-13 and PHP 8.3+. Applications without Livewire keep the same framework-free runtime and need no new frontend dependency, build, database migration or endpoint.
 
 ## Setup
 

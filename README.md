@@ -14,6 +14,7 @@ PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required 
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
 - Optional database audit history with signed copies of the rendered banner and preferences dialog.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
+- Optional Livewire 3/4 support for components, navigation, and interface language changes. See [Livewire](https://consent.lipinskijakub.pl/docs/livewire).
 - GA4, Google Ads, Meta Pixel, Microsoft Clarity, Matomo, and TikTok Pixel presets, including Google Consent Mode v2.
 - Laravel Boost guidelines and a development skill with focused configuration, integration, and verification references.
 - Consent withdrawal with declared cookie cleanup and a default reload when optional code is already running.
@@ -130,10 +131,6 @@ New optional grants wait for a database receipt; refusal and withdrawal take eff
 
 The package includes discoverable guidelines and the `consent-for-laravel-development` skill. In your application, run `php artisan boost:install`, select this package, and enable guidelines and skills for your agents. Existing Boost installations can add it through `php artisan boost:update --discover`. See the [Boost guide](https://consent.lipinskijakub.pl/docs/laravel-boost) for installation, generated files, reference contents, and custom overrides. Boost is optional and is not a package runtime dependency.
 
-## Livewire (unreleased)
-
-The development branch supports Livewire 3/4 component updates and `wire:navigate` through the same Blade components and browser API. The banner follows application-language changes, preserving saved choices and pairing translated UI with its audit notice. Livewire remains optional. See the [Livewire guide](docs/livewire.md) for versions, stable script IDs, persist, SPA measurements, CSP profiles and upgrade requirements. This feature has not been tagged or published yet.
-
 ## Documentation and updates
 
 The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) contains the complete configuration reference and guides:
@@ -143,7 +140,7 @@ The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) 
 - [Persistence](https://consent.lipinskijakub.pl/docs/persistence), [withdrawal](https://consent.lipinskijakub.pl/docs/withdrawal), and [security](https://consent.lipinskijakub.pl/docs/security).
 - [Upgrading](https://consent.lipinskijakub.pl/docs/upgrading), including earlier VCS installs, and [troubleshooting](https://consent.lipinskijakub.pl/docs/troubleshooting).
 
-Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. See the [v1.4.1 upgrade notes](docs/releases/v1.4.1.md#upgrade) for the runtime fixes and updated error messages. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
+Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. See the [upgrade guide](https://consent.lipinskijakub.pl/docs/upgrading#livewire-and-language-update) for Livewire, published resources, and translation changes. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
 
 The browser-readable preference cookie is user-editable and must not be used for authorization or an audit trail. The package provides consent tooling; it does not certify legal compliance or the accessibility of your host website. Describe actual purposes and test the integrated application.
 

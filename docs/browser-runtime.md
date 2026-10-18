@@ -113,7 +113,7 @@ Errors never include the saved cookie or visitor identifiers. If another library
 
 ## SPA fragments and deduplication
 
-The unreleased development branch includes a dedicated [Livewire integration](livewire.md) for navigation, component updates, language changes, paired audit notices, history safety and CSP. Its navigation event adds no automatic measurement.
+The dedicated [Livewire integration](livewire.md) coordinates navigation, component updates, language changes, paired audit notices, history safety and CSP. Its navigation event adds no automatic measurement.
 
 A MutationObserver discovers new templates after page navigation or fragment insertion. Use an explicit stable ID for each logical block, because generated IDs restart with each server render. An identical ID/category/content combination runs once; a conflicting combination is ignored with a diagnostic. Distinct inline blocks intentionally remain distinct. External resources share a loading promise for the same normalized URL, classic/module kind, integrity, CORS, and referrer policy.
 

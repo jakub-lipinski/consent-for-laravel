@@ -3,7 +3,7 @@
 
 This application uses `jakub-lipinski/consent-for-laravel` for consent preferences, guarded scripts, tracking presets, and optional decision auditing.
 
-- Activate `consent-for-laravel-development` when configuring this package, changing its interface, integrating trackers, measuring events, or working with consent decisions.
+- Activate `consent-for-laravel-development` when configuring this package, changing its interface, integrating trackers or Livewire, measuring events, or working with consent decisions.
 - Inspect `config/consent.php`, the shared Blade layout, and existing tracker installations before making changes. Preserve the application's selected integrations and customizations.
 - Built-in presets register their own services and SDKs. Custom providers need a service definition and `@consent` script blocks.
 - Keep script markup inert and independent of request cookies so cached HTML works for every visitor. Use guarded `Consent` helpers for measurements.
