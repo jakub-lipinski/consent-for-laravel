@@ -120,7 +120,11 @@ test('persisted interfaces follow a language switch through a safe full refresh'
     await accept(page);
     const state = await page.evaluate(() => Consent.state());
     await navigate(page, '#page-b', 'en b');
-    await navigate(page, '#language-pl', 'pl b');
+    const token = await page.evaluate(() => fixtureDocument);
+    await page.locator('#language-pl').click();
+    await page.waitForFunction(old => window.fixtureDocument !== undefined && window.fixtureDocument !== old, token);
+    await expect(page.locator('#page-title')).toHaveText('pl b');
+    await idle(page);
     await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', 'pl');
     expect(await page.evaluate(() => Consent.state())).toEqual(state);
     await page.locator('#outside').click();
