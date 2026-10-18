@@ -65,8 +65,9 @@ PHP);
 $write('resources/views/livewire/fixture.blade.php', <<<'BLADE'
 <div>
     <button id="update" wire:click="$set('counter', {{ $counter + 1 }})">Update component</button>
-    <button id="component-pl" wire:click="language('pl')">Polski component</button>
-    <button id="component-en" wire:click="language('en')">English component</button>
+    @foreach(['en', 'pl', 'cs', 'nl'] as $lang)
+    <button id="component-{{ $lang }}" wire:click="language('{{ $lang }}')">{{ $lang }} component</button>
+    @endforeach
     <output id="counter">{{ $counter }}</output>
     @consent('analytics', 'component-'.$counter)
     <script>window.fixtureComponents = (window.fixtureComponents || 0) + 1;</script>
@@ -96,7 +97,7 @@ document.addEventListener('securitypolicyviolation', e => { (window.fixtureCsp |
 </script>
 </head><body>
 <main><h1 id="page-title">{{ $locale }} {{ $page }}</h1><nav>
-@foreach(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt'] as $lang)
+@foreach(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl'] as $lang)
 <a id="language-{{ $lang }}" href="/{{ $lang }}/{{ $page }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" wire:navigate>{{ $lang }}</a>
 @endforeach
 @foreach(['a', 'b', 'c'] as $next)
@@ -145,7 +146,7 @@ Route::get('/fixture/sdk.js', function () {
 Route::get('/fixture/import.js', fn () => response('export const value = 42;', 200, ['Content-Type' => 'application/javascript']));
 Route::get('/fixture/module.js', fn () => response('import { value } from "/fixture/import.js"; await new Promise(r => setTimeout(r, 40)); window.fixtureModuleDone = value;', 200, ['Content-Type' => 'application/javascript']));
 Route::get('/{locale}/{page?}', function (string $locale, string $page = 'a') {
-    abort_unless(in_array($locale, ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt']), 404);
+    abort_unless(in_array($locale, ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl']), 404);
     app()->setLocale($locale);
     config(['consent.ui.variant' => request('variant', 'standard'), 'consent.ui.position' => request('position', 'bottom-left'), 'consent.ui.theme' => request('theme', 'light')]);
     if ($page === 'context') config(['consent.policy_version' => '2']);

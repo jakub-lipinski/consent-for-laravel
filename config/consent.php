@@ -133,7 +133,7 @@ return [
     | A null locale follows the application locale, with parent-language and
     | English fallbacks. Custom translation locales are also supported.
     |
-    | Bundled languages: en, pl, de, fr, it, es, pt (European Portuguese).
+    | Bundled languages: en, pl, de, fr, it, es, pt (European Portuguese), cs, nl.
     |
     */
 

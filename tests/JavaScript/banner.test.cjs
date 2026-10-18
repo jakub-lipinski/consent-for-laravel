@@ -225,7 +225,7 @@ test('storage failures keep a retryable interface and never present a saved succ
 });
 
 for (const variant of ['standard', 'compact']) {
-    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt']) {
+    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl']) {
         test(`failed audit in ${variant} ${locale} keeps old grants and displays a neutral retryable error`, async t => {
             let available = false;
             const requests = [];
@@ -418,7 +418,7 @@ for (const variant of ['standard', 'compact']) {
 }
 
 for (const variant of ['standard', 'compact']) {
-    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt']) {
+    for (const locale of ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl']) {
         test(`axe structural WCAG checks pass for ${variant} ${locale} banner and modal`, async t => {
             const p = await page(t, { input: { locale, ui: { variant } } });
             assert.equal(p.root.lang, locale);

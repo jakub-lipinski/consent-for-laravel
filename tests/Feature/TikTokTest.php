@@ -101,4 +101,4 @@ it('includes translated TikTok in signed database audit notices for every langua
     } finally {
         $migration->down();
     }
-})->with(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt'])->with(['standard', 'compact']);
+})->with(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl'])->with(['standard', 'compact']);

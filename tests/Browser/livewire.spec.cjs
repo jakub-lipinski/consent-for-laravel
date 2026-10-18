@@ -4,6 +4,10 @@ const { readFileSync } = require('node:fs');
 const axe = readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 const banner = '[data-consent-banner]';
 const dialog = '[data-consent-dialog]';
+const localizedText = {
+    cs: { accept: 'Přijmout vše', preferences: 'Předvolby souborů cookie', error: 'Vaše předvolby se nepodařilo uložit. Zkuste to prosím znovu.' },
+    nl: { accept: 'Alles accepteren', preferences: 'Cookievoorkeuren', error: 'Je voorkeuren konden niet worden opgeslagen. Probeer het opnieuw.' },
+};
 const idle = page => page.evaluate(() => window.Consent.whenIdle());
 async function visit(page, path = '/en/a') {
     const response = await page.goto(path);
@@ -60,13 +64,19 @@ test('language navigation updates banner dialog labels and audit snapshot withou
     await visit(page);
     await accept(page);
     const original = await page.evaluate(() => ({ state: Consent.state(), token: fixtureDocument }));
-    for (const locale of ['pl', 'de', 'fr', 'it', 'es', 'pt', 'en']) {
+    for (const locale of ['pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl', 'en']) {
         await navigate(page, `#language-${locale}`, `${locale} a`);
         await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', locale);
         await page.locator('#outside').click();
         await expect(page.locator(dialog)).toBeVisible();
         const payload = await page.locator('script[data-consent-notice]').textContent();
-        expect(JSON.parse(JSON.parse(payload).payload).locale).toBe(locale);
+        const snapshot = JSON.parse(JSON.parse(payload).payload);
+        expect(snapshot.locale).toBe(locale);
+        if (localizedText[locale]) {
+            await expect(page.locator(`${banner} [data-consent-action="accept"]`)).toHaveText(localizedText[locale].accept);
+            await expect(page.locator('#consent-preferences-title')).toHaveText(localizedText[locale].preferences);
+            expect(snapshot.html).toContain(localizedText[locale].preferences);
+        }
         await page.keyboard.press('Escape');
         expect(await page.evaluate(() => Consent.state())).toEqual(original.state);
     }
@@ -74,29 +84,32 @@ test('language navigation updates banner dialog labels and audit snapshot withou
     expect(await page.evaluate(() => fixtureSdkLoads)).toBe(1);
 });
 
-test('component locale changes replace the protected UI and keep controls functional', async ({ page }) => {
-    await visit(page, '/en/a?component=1');
-    await page.locator('#outside').click();
-    await page.locator('#consent-category-analytics').check();
-    // Ordinary morphs preserve the open dialog and draft.
-    await page.evaluate(() => Livewire.first().$set('counter', 1));
-    await expect(page.locator('#counter')).toHaveText('1');
-    await expect(page.locator(dialog)).toBeVisible();
-    await expect(page.locator('#consent-category-analytics')).toBeChecked();
-    await page.keyboard.press('Escape');
-    await page.locator('#component-pl').click();
-    await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', 'pl');
-    await page.locator('#outside').click();
-    await expect(page.locator(dialog)).toBeVisible();
-    await expect(page.locator('#consent-category-analytics')).not.toBeChecked();
-    await page.locator('#consent-category-analytics').check();
-    await page.locator(`${dialog} [data-consent-action="save"]`).click();
-    await idle(page);
-    expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(true);
-    await page.locator('#component-en').click();
-    await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', 'en');
-    expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(true);
-});
+for (const locale of ['pl', 'cs', 'nl']) {
+    test(`component locale changes to ${locale} replace the protected UI and keep controls functional`, async ({ page }) => {
+        await visit(page, '/en/a?component=1');
+        await page.locator('#outside').click();
+        await page.locator('#consent-category-analytics').check();
+        // Ordinary morphs preserve the open dialog and draft.
+        await page.evaluate(() => Livewire.first().$set('counter', 1));
+        await expect(page.locator('#counter')).toHaveText('1');
+        await expect(page.locator(dialog)).toBeVisible();
+        await expect(page.locator('#consent-category-analytics')).toBeChecked();
+        await page.keyboard.press('Escape');
+        await page.locator(`#component-${locale}`).click();
+        await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', locale);
+        expect(JSON.parse(JSON.parse(await page.locator('script[data-consent-notice]').textContent()).payload).locale).toBe(locale);
+        await page.locator('#outside').click();
+        await expect(page.locator(dialog)).toBeVisible();
+        await expect(page.locator('#consent-category-analytics')).not.toBeChecked();
+        await page.locator('#consent-category-analytics').check();
+        await page.locator(`${dialog} [data-consent-action="save"]`).click();
+        await idle(page);
+        expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(true);
+        await page.locator('#component-en').click();
+        await expect(page.locator('[data-consent-ui]')).toHaveAttribute('lang', 'en');
+        expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(true);
+    });
+}
 
 test('navigation discards a draft and leaves no modal backdrop or stale focus', async ({ page }) => {
     await visit(page);
@@ -217,15 +230,18 @@ test('a delayed audit keeps its original language and cannot revive a newer refu
     expect(await page.evaluate(() => window.fixtureSdkLoads)).toBeUndefined();
 });
 
-test('an unavailable audit leaves a retryable interface without activating a grant', async ({ page }) => {
-    await page.route('**/consent/decisions', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
-    await visit(page);
-    await page.locator(`${banner} [data-consent-action="accept"]`).click();
-    await idle(page);
-    await expect(page.locator(`${banner} [data-consent-error]`)).toBeVisible();
-    expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(false);
-    expect(await page.evaluate(() => window.fixtureSdkLoads)).toBeUndefined();
-});
+for (const locale of ['en', 'cs', 'nl']) {
+    test(`an unavailable audit leaves a translated retryable ${locale} interface without activating a grant`, async ({ page }) => {
+        await page.route('**/consent/decisions', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+        await visit(page, `/${locale}/a`);
+        await page.locator(`${banner} [data-consent-action="accept"]`).click();
+        await idle(page);
+        await expect(page.locator(`${banner} [data-consent-error]`)).toBeVisible();
+        if (localizedText[locale]) await expect(page.locator(`${banner} [data-consent-error]`)).toHaveText(localizedText[locale].error);
+        expect(await page.evaluate(() => Consent.allowed('analytics'))).toBe(false);
+        expect(await page.evaluate(() => window.fixtureSdkLoads)).toBeUndefined();
+    });
+}
 
 test('a cancelled Livewire navigation keeps the open draft and makes no decision', async ({ page }) => {
     await visit(page);
@@ -260,45 +276,49 @@ test('history-only refusal survives an active reload and subsequent Livewire pus
     expect(await page.evaluate(() => window.fixtureSdkLoads)).toBeUndefined();
 });
 
-test('native modal keyboard, contrast, reflow and text resizing survive navigation', async ({ page }) => {
-    await visit(page, '/en/a?variant=compact&position=bottom-center&theme=dark');
-    await navigate(page, '#language-fr', 'fr a');
-    await page.locator('#outside').click();
-    await expect(page.locator('#consent-preferences-title')).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    await expect(page.locator(`${dialog} [data-consent-action="save"]`)).toBeFocused();
-    await page.keyboard.press('Tab');
-    await expect(page.locator(`${dialog} [data-consent-action="close"]`)).toBeFocused();
-    await page.locator('#consent-category-analytics').focus();
-    await page.keyboard.press('Space');
-    await expect(page.locator('#consent-category-analytics')).toBeChecked();
-    await page.setViewportSize({ width: 320, height: 800 });
-    await page.addStyleTag({ content: 'html { font-size: 200% } .consent-ui * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important }' });
-    await page.locator(`${dialog} [data-consent-action="save"]`).focus();
-    const geometry = await page.locator(dialog).evaluate(el => ({ width: el.getBoundingClientRect().width, scroll: el.scrollWidth, client: el.clientWidth }));
-    expect(geometry.width).toBeLessThanOrEqual(320);
-    expect(geometry.scroll).toBeLessThanOrEqual(geometry.client + 1);
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.addScriptTag({ content: axe });
-    const results = await page.evaluate(() => axe.run('[data-consent-ui]', { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }));
-    expect(results.violations).toEqual([]);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('#outside')).toBeFocused();
-});
-
-test('both variants reflow in every position and theme after a locale change', async ({ page }) => {
-    test.setTimeout(90000);
-    await page.setViewportSize({ width: 320, height: 800 });
-    for (const variant of ['standard', 'compact']) for (const position of ['bottom-left', 'bottom-right', 'bottom-center']) for (const theme of ['light', 'dark', 'auto']) {
-        await page.emulateMedia({ colorScheme: 'dark' });
-        await visit(page, `/en/a?variant=${variant}&position=${position}&theme=${theme}`);
-        await navigate(page, '#language-de', 'de a');
+for (const locale of ['fr', 'cs', 'nl']) {
+    test(`native ${locale} modal keyboard, contrast, reflow and text resizing survive navigation`, async ({ page }) => {
+        await visit(page, '/en/a?variant=compact&position=bottom-center&theme=dark');
+        await navigate(page, `#language-${locale}`, `${locale} a`);
         await page.locator('#outside').click();
+        await expect(page.locator('#consent-preferences-title')).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(page.locator(`${dialog} [data-consent-action="save"]`)).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(page.locator(`${dialog} [data-consent-action="close"]`)).toBeFocused();
+        await page.locator('#consent-category-analytics').focus();
+        await page.keyboard.press('Space');
+        await expect(page.locator('#consent-category-analytics')).toBeChecked();
+        await page.setViewportSize({ width: 320, height: 800 });
         await page.addStyleTag({ content: 'html { font-size: 200% } .consent-ui * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important }' });
         await page.locator(`${dialog} [data-consent-action="save"]`).focus();
-        const size = await page.locator(dialog).evaluate(el => ({ width: el.getBoundingClientRect().width, scroll: el.scrollWidth, client: el.clientWidth }));
-        expect(size.width).toBeLessThanOrEqual(320);
-        expect(size.scroll).toBeLessThanOrEqual(size.client + 1);
+        const geometry = await page.locator(dialog).evaluate(el => ({ width: el.getBoundingClientRect().width, scroll: el.scrollWidth, client: el.clientWidth }));
+        expect(geometry.width).toBeLessThanOrEqual(320);
+        expect(geometry.scroll).toBeLessThanOrEqual(geometry.client + 1);
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.addScriptTag({ content: axe });
+        const results = await page.evaluate(() => axe.run('[data-consent-ui]', { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] } }));
+        expect(results.violations).toEqual([]);
         await page.keyboard.press('Escape');
-    }
-});
+        await expect(page.locator('#outside')).toBeFocused();
+    });
+}
+
+for (const locale of ['de', 'cs', 'nl']) {
+    test(`both variants reflow in every position and theme after a locale change to ${locale}`, async ({ page }) => {
+        test.setTimeout(90000);
+        await page.setViewportSize({ width: 320, height: 800 });
+        for (const variant of ['standard', 'compact']) for (const position of ['bottom-left', 'bottom-right', 'bottom-center']) for (const theme of ['light', 'dark', 'auto']) {
+            await page.emulateMedia({ colorScheme: 'dark' });
+            await visit(page, `/en/a?variant=${variant}&position=${position}&theme=${theme}`);
+            await navigate(page, `#language-${locale}`, `${locale} a`);
+            await page.locator('#outside').click();
+            await page.addStyleTag({ content: 'html { font-size: 200% } .consent-ui * { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important }' });
+            await page.locator(`${dialog} [data-consent-action="save"]`).focus();
+            const size = await page.locator(dialog).evaluate(el => ({ width: el.getBoundingClientRect().width, scroll: el.scrollWidth, client: el.clientWidth }));
+            expect(size.width).toBeLessThanOrEqual(320);
+            expect(size.scroll).toBeLessThanOrEqual(size.client + 1);
+            await page.keyboard.press('Escape');
+        }
+    });
+}

@@ -128,12 +128,12 @@ it('preserves old cached text while creating new notices for overrides and langu
 });
 
 it('captures regional service overrides, per-key fallback, custom languages, and component props', function () {
-    app('translator')->addLines(['messages.banner_title' => 'Titel'], 'nl', 'consent');
-    app('translator')->addLines(['services.stats.description' => 'Regionale beschrijving'], 'nl-BE', 'consent');
-    $notice = auditEnvelope('<x-consent::banner locale="nl-BE" variant="compact" position="bottom-right" policy-url="/cookies" />');
+    app('translator')->addLines(['messages.banner_title' => 'Rubrik'], 'sv', 'consent');
+    app('translator')->addLines(['services.stats.description' => 'Regional beskrivning'], 'sv-FI', 'consent');
+    $notice = auditEnvelope('<x-consent::banner locale="sv-FI" variant="compact" position="bottom-right" policy-url="/cookies" />');
     $snapshot = json_decode($notice['payload'], true);
-    expect($snapshot['locale'])->toBe('nl')->and($snapshot['requested_locale'])->toBe('nl-BE')
-        ->and($snapshot['html'])->toContain('Titel', 'Regionale beschrijving', 'Accept all', 'href="/cookies"')
+    expect($snapshot['locale'])->toBe('sv')->and($snapshot['requested_locale'])->toBe('sv-FI')
+        ->and($snapshot['html'])->toContain('Rubrik', 'Regional beskrivning', 'Accept all', 'href="/cookies"')
         ->and($snapshot['presentation']['variant'])->toBe('compact')->and($snapshot['presentation']['position'])->toBe('bottom-right');
 });
 
@@ -142,7 +142,7 @@ it('captures every bundled language and both variants without depending on the d
     $snapshot = json_decode($notice['payload'], true);
     expect($snapshot['locale'])->toBe($locale)->and($snapshot['presentation']['variant'])->toBe($variant);
     auditPost(auditSubmission(notice: $notice))->assertCreated();
-})->with(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt'])->with(['standard', 'compact']);
+})->with(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl'])->with(['standard', 'compact']);
 
 it('supports previous signing keys for cached pages and rejects removed keys', function () {
     $old = auditEnvelope();
