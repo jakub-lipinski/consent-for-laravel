@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add complete Czech (`cs`) and Dutch (`nl`) interfaces, including preset purposes, accessible labels, status/error messages and audit notices, with regional fallback and Livewire language switching.
 - Add optional Livewire 3/4 lifecycle coordination for navigation, redirects, history, morphs and dynamic components, preserving ordered and deduplicated consent gates.
 - Update the banner and paired audit notice after navigation or component locale changes, retaining choices and expiry. Protect unchanged UI drafts during morphs and discard them on page swaps.
 - Protect Livewire 4 single-file gated scripts before extraction, and provide stable template keys without requiring Livewire in production dependencies.

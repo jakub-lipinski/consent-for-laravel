@@ -37,7 +37,7 @@ After permission, the preset loads TikTok's `events.js` once, waits for its seco
 
 The preset does not infer purchases, registrations, or other business events. Account-controlled automatic event detection, SPA handling, matching, cookie, and data-sharing settings may cause additional SDK behavior. Review those settings in Events Manager; disable overlapping automatic measurements when your application sends the same events explicitly.
 
-The reserved service `tiktok-pixel` belongs to `marketing`. Its purpose is displayed in all seven bundled languages; optional canonical `name` and `description` overrides use the existing translation rules. Unknown config keys and manual service ID collisions are rejected.
+The reserved service `tiktok-pixel` belongs to `marketing`. Its purpose is displayed in all nine bundled languages; optional canonical `name` and `description` overrides use the existing translation rules. Unknown config keys and manual service ID collisions are rejected.
 
 ## Browser API
 
@@ -109,7 +109,7 @@ TikTok uses the ordered loader after eligible Google, Meta, Clarity, and Matomo 
 
 Pass your request's CSP nonce to both Blade components. The controlled bootstrap inherits that nonce; TikTok creates additional scripts itself. Use nonce plus `strict-dynamic`, or authorize `https://analytics.tiktok.com` in `script-src` for those scripts. Allow required TikTok collection origins in `connect-src` and `img-src`; a nonce alone does not permit these requests. Review the current SDK and enabled account/plugins for additional origins, and test your actual CSP, blockers, and reporting.
 
-Local tests cover configuration caching, fingerprints, seven languages, audit writes, API payloads, loading order, expiry, failure/withdrawal races, protected cookies, and coexistence with existing presets. Native Chrome verification uses a disposable Laravel host, the official TikTok SDK, simulated Pixel settings, and intercepted collection endpoints. It verifies SDK requests and payloads, not processing or reports in a live TikTok Ads account. Configured CI coverage and locally executed PHP/Laravel versions are separate claims.
+Local tests cover configuration caching, fingerprints, bundled languages, audit writes, API payloads, loading order, expiry, failure/withdrawal races, protected cookies, and coexistence with existing presets. Native Chrome verification uses a disposable Laravel host, the official TikTok SDK, simulated Pixel settings, and intercepted collection endpoints. It verifies SDK requests and payloads, not processing or reports in a live TikTok Ads account. Configured CI coverage and locally executed PHP/Laravel versions are separate claims.
 
 ## Primary references
 

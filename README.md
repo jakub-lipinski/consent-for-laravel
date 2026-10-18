@@ -9,7 +9,7 @@ PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required 
 ## What is included
 
 - Matching Standard and Compact banners/preferences dialogs, three positions, editable colors and wording, and a reopening button.
-- English, Polish, German, French, Italian, Spanish, and European Portuguese, plus custom languages with per-key fallback.
+- English, Polish, German, French, Italian, Spanish, European Portuguese, Czech, and Dutch, plus custom languages with per-key fallback.
 - Configuration-only light, dark, and automatic themes, with independent color palettes for both variants.
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
 - Optional database audit history with signed copies of the rendered banner and preferences dialog.

@@ -37,7 +37,7 @@ Preserve a visible retryable alert after a failed save. Merge the current `save_
 
 ### Translations
 
-Bundled locales are `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt`. Null locale follows the application; regional locales fall back to their parent and then English per key. Custom locales can use the same dictionary structure.
+Bundled locales are `en`, `pl`, `de`, `fr`, `it`, `es`, `pt`, `cs` (Czech), and `nl` (Dutch). Null locale follows the application; regional locales such as `cs-CZ`, `nl-NL`, and `nl-BE` fall back to their parent and then English per key. Custom locales can use the same dictionary structure. Partial published overrides inherit remaining keys from the matching bundled dictionary.
 
 ```bash
 php artisan vendor:publish --tag=consent-translations

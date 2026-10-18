@@ -59,7 +59,7 @@ Each full document load with a restored, valid grant sends its own initial page 
 
 `send_page_view` disables only the initial page view. `enable_link_tracking` disables only automatic outlink/download listeners. Both are actual boolean values and default to `true`; manual helpers remain available when either is `false`.
 
-The preset registers the reserved service ID `matomo` in `analytics`. Its purpose is displayed in all seven bundled languages. Optional canonical `name` and `description` overrides use the same translation rules as other presets. Unknown config keys and manual service ID collisions are rejected.
+The preset registers the reserved service ID `matomo` in `analytics`. Its purpose is displayed in all nine bundled languages. Optional canonical `name` and `description` overrides use the same translation rules as other presets. Unknown config keys and manual service ID collisions are rejected.
 
 ## Browser API
 
@@ -175,7 +175,7 @@ Blade HTML remains independent of visitor preferences and safe for HTML caching.
 
 The preference schema is unchanged. Matomo disabled preserves existing service fingerprints. Enabling it or changing the normalized instance URL, site ID, automatic behavior, canonical purposes, or cookie scope invalidates old decisions; visitors must choose again. UI-only translations and presentation changes do not invalidate consent.
 
-Local tests cover PHP configuration caching, consent fingerprints, seven translations, guarded helper behavior, loading failures, races, expiry, and cookie cleanup. Native Chrome verification uses a disposable Laravel host and the official Matomo SDK with a local collection endpoint; it checks emitted measurement payloads, cookies, CSP, modules, and UI behavior. It does not establish processing/reporting by a live Cloud account or self-hosted Matomo server. CI compatibility coverage and locally executed framework versions are separate claims.
+Local tests cover PHP configuration caching, consent fingerprints, bundled translations, guarded helper behavior, loading failures, races, expiry, and cookie cleanup. Native Chrome verification uses a disposable Laravel host and the official Matomo SDK with a local collection endpoint; it checks emitted measurement payloads, cookies, CSP, modules, and UI behavior. It does not establish processing/reporting by a live Cloud account or self-hosted Matomo server. CI compatibility coverage and locally executed framework versions are separate claims.
 
 ## Primary references
 
