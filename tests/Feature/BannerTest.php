@@ -101,7 +101,7 @@ it('escapes service text, policy links, and translated UI content', function () 
 it('renders CSP nonces and can reference published styles and UI scripts', function () {
     $inline = Blade::render('<x-consent::banner nonce="example-nonce" />');
     $published = Blade::render('<x-consent::banner nonce="example-nonce" style-src="/vendor/consent/consent.css" script-src="/vendor/consent/banner.js" />');
-    expect($inline)->toContain('<style  nonce="example-nonce"', '<script  nonce="example-nonce"')
+    expect($inline)->toContain('<style  nonce="example-nonce"', '<script data-consent-ui-runtime data-navigate-once  nonce="example-nonce"')
         ->and($published)->toContain('href="/vendor/consent/consent.css"', 'src="/vendor/consent/banner.js"')
         ->not->toContain('function mount(root)', '--consent-background: #ffffff');
     $sources = array_map('realpath', array_keys(ServiceProvider::pathsToPublish(ConsentForLaravelServiceProvider::class, 'consent-assets')));

@@ -3,16 +3,18 @@
 namespace ConsentForLaravel\ConsentForLaravel;
 
 use Illuminate\Contracts\Config\Repository;
+use InvalidArgumentException;
 use RuntimeException;
 
 final readonly class BrowserRuntime
 {
-    public function __construct(private ConsentSettings $settings, private ServiceRegistry $services, private Repository $configuration, private AuditSettings $audit) {}
+    public function __construct(private ConsentSettings $settings, private ServiceRegistry $services, private Repository $configuration, private AuditSettings $audit, private LivewireSupport $livewire) {}
 
     /** @return array<string, mixed> */
     public function configuration(): array
     {
         return [
+            'livewire' => $this->livewire->configuration(),
             'audit' => $this->audit->enabled ? ['path' => $this->audit->path, 'timeoutMs' => $this->audit->timeoutMs] : null,
             'schemaVersion' => ConsentState::SCHEMA_VERSION,
             'policyVersion' => $this->settings->policyVersion,
@@ -45,5 +47,26 @@ final readonly class BrowserRuntime
     public function source(): string
     {
         return file_get_contents(__DIR__.'/../resources/js/consent.js') ?: throw new RuntimeException('Consent browser runtime is missing.');
+    }
+
+    public function context(): string
+    {
+        $assets = array_map(fn (string $path): string => (string) hash_file('sha256', __DIR__.'/../resources/'.$path), ['js/consent.js', 'js/banner.js', 'css/consent.css']);
+
+        return hash('sha256', $this->json()).':'.hash('sha256', implode(':', $assets));
+    }
+
+    public function locale(): string
+    {
+        $configured = $this->configuration->get('consent.ui.locale');
+        try {
+            return BannerSettings::locale($configured ?? $this->configuration->get('app.locale', 'en'));
+        } catch (InvalidArgumentException $exception) {
+            if ($configured !== null) {
+                throw $exception;
+            }
+
+            return 'en';
+        }
     }
 }

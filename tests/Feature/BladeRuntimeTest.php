@@ -18,7 +18,7 @@ it('renders the short directive into inert templates regardless of request cooki
         @endconsent
         BLADE, ['measurement' => 'value']);
 
-    expect($rendered)->toContain('<template data-consent-block="consent-auto-1" data-consent-category="analytics">')
+    expect($rendered)->toContain('<template data-consent-block="consent-auto-1" data-consent-category="analytics"')
         ->toContain('window.measurement = "value";')
         ->toContain("</script>\n</template>")
         ->and(substr_count($rendered, '<template'))->toBe(1);

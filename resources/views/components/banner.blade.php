@@ -8,14 +8,6 @@
     $placement = \ConsentForLaravel\ConsentForLaravel\BannerSettings::position($position ?? $ui->settings->position);
     $policy = \ConsentForLaravel\ConsentForLaravel\BannerSettings::policyUrl($policyUrl ?? $ui->settings->policyUrl);
 @endphp
-@if($styleSrc !== null)
-<link rel="stylesheet" href="{{ $styleSrc }}" />
-@else
-<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! $ui->styles() !!}</style>
-@endif
-@if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS || $ui->settings->darkColors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::DARK_COLORS)
-<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{!! $ui->settings->variables(true) !!}{{ '}' }}</style>
-@endif
 @php ob_start(); try { @endphp
 <div class="consent-ui" data-consent-ui data-consent-position="{{ $placement }}" data-consent-variant="{{ $appearance }}" data-consent-theme="{{ $ui->settings->theme }}" lang="{{ $languageTag }}" dir="ltr"
      data-message-saving="{{ $ui->text('saving', $language) }}" data-message-saved="{{ $ui->text('saved', $language) }}"
@@ -97,14 +89,26 @@
         'theme' => $ui->settings->theme, 'colors' => $ui->settings->colors, 'dark_colors' => $ui->settings->darkColors,
         'style_src' => $styleSrc, 'script_src' => $scriptSrc,
     ]);
+    $presentation = hash('sha256', $noticeHtml.$ui->settings->variables().$ui->settings->variables(true).($styleSrc ?? ''));
 @endphp
+<div data-consent-container data-consent-presentation="{{ $presentation }}" data-consent-locale="{{ $language }}" data-consent-locale-fixed="{{ $locale !== null ? 'true' : 'false' }}" data-consent-context="{{ app(\ConsentForLaravel\ConsentForLaravel\BrowserRuntime::class)->context() }}"
+     @if(app(\ConsentForLaravel\ConsentForLaravel\LivewireSettings::class)->enabled) wire:ignore wire:key="consent-ui-{{ $presentation }}" @endif>
+@if($styleSrc !== null)
+<link rel="stylesheet" href="{{ $styleSrc }}" />
+@else
+<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! $ui->styles() !!}</style>
+@endif
+@if($ui->settings->colors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::COLORS || $ui->settings->darkColors !== \ConsentForLaravel\ConsentForLaravel\BannerSettings::DARK_COLORS)
+<style @if($nonce !== null) nonce="{{ $nonce }}" @endif>.consent-ui{{ '{' }}{!! $ui->settings->variables() !!}{!! $ui->settings->variables(true) !!}{{ '}' }}</style>
+@endif
 {!! $noticeHtml !!}
 @if($notice !== null)
 <script type="application/json" data-consent-notice @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! json_encode($notice, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) !!}</script>
 @endif
+</div>
 @if($scriptSrc !== null)
-<script src="{{ $scriptSrc }}" @if($nonce !== null) nonce="{{ $nonce }}" @endif></script>
+<script src="{{ $scriptSrc }}" data-consent-ui-runtime data-navigate-once @if($nonce !== null) nonce="{{ $nonce }}" @endif></script>
 @else
-<script @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! $ui->script() !!}</script>
+<script data-consent-ui-runtime data-navigate-once @if($nonce !== null) nonce="{{ $nonce }}" @endif>{!! $ui->script() !!}</script>
 @endif
 @endonce

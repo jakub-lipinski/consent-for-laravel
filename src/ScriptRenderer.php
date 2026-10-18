@@ -8,6 +8,8 @@ final class ScriptRenderer
 {
     private int $sequence = 0;
 
+    public function __construct(private readonly bool $livewire = false) {}
+
     public function open(Category|string $category, ?string $id = null): string
     {
         $category = is_string($category) ? Category::from($category) : $category;
@@ -20,6 +22,7 @@ final class ScriptRenderer
             throw new InvalidArgumentException('Consent block IDs must start with a letter and contain only letters, digits, dots, underscores, colons, or hyphens.');
         }
 
-        return '<template data-consent-block="'.e($id).'" data-consent-category="'.$category->value.'">';
+        return '<template data-consent-block="'.e($id).'" data-consent-category="'.$category->value.'"'
+            .($this->livewire ? ' wire:key="consent-block-'.e($id).'"' : '').'>';
     }
 }

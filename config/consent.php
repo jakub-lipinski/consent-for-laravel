@@ -109,6 +109,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Livewire
+    |--------------------------------------------------------------------------
+    |
+    | Coordinate component updates and wire:navigate automatically, without
+    | requiring Livewire in applications that do not use it. Auto preserves
+    | SPA navigation; Livewire 3 with nonce-based assets uses full visits.
+    | Reload forces full visits. Neither mode adds analytics page views.
+    |
+    */
+
+    'livewire' => [
+        'enabled' => true,
+        'navigation' => 'auto', // auto | reload
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Consent Interface
     |--------------------------------------------------------------------------
     |

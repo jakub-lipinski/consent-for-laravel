@@ -26,6 +26,7 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
 
     public function packageRegistered(): void
     {
+        $this->app->bind(LivewireSettings::class, fn (Application $app): LivewireSettings => new LivewireSettings($app->make(Repository::class)->get('consent.livewire', [])));
         $this->app->bind(ConsentSettings::class, fn (Application $app): ConsentSettings => new ConsentSettings(
             $app->make(Repository::class)->get('consent'),
             $app->make(Repository::class)->get('session.cookie'),
@@ -54,7 +55,9 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
 
             return new ServiceRegistry($app->make(Repository::class)->get('consent.services', []), $google->services() + $trackers->services(), $context);
         });
-        $this->app->scoped(ScriptRenderer::class);
+        $this->app->scoped(ScriptRenderer::class, fn (Application $app): ScriptRenderer => new ScriptRenderer(
+            $app->make(LivewireSettings::class)->enabled && $app->make(LivewireSupport::class)->configuration()['major'] !== null,
+        ));
         $this->app->bind(BannerSettings::class, function (Application $app): BannerSettings {
             $settings = new BannerSettings($app->make(Repository::class)->get('consent.ui', []));
             if ($settings->colorWarnings !== []) {
@@ -92,6 +95,13 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
         $blade = $this->app->make(BladeCompiler::class);
         $blade->directive('consent', fn (string $expression): string => '<?php echo app(\\'.ScriptRenderer::class.'::class)->open('.$expression.'); ?>');
         $blade->directive('endconsent', fn (): string => '</template>');
+
+        $this->callAfterResolving('livewire', function (object $livewire): void {
+            // Inertness must also hold when navigation coordination is disabled.
+            if (method_exists($livewire, 'prepareViewsForCompilationUsing')) {
+                $livewire->prepareViewsForCompilationUsing($this->app->make(LivewireBladePrecompiler::class));
+            }
+        });
 
         $this->publishes([
             __DIR__.'/../resources/js/consent.js' => public_path('vendor/consent/consent.js'),

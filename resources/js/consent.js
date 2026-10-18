@@ -68,6 +68,10 @@
             throw new Error('Invalid tracker runtime configuration.');
         }
         config.trackers = trackers;
+        const livewire = config.livewire ?? { enabled: true, navigation: 'auto', major: null };
+        if (!livewire || typeof livewire.enabled !== 'boolean' || !['auto', 'reload'].includes(livewire.navigation)
+            || livewire.major !== null && !Number.isInteger(livewire.major)) throw new Error('Invalid Livewire consent configuration.');
+        config.livewire = livewire;
         if (trackers.meta && (window.fbq !== undefined || window._fbq !== undefined)
             || trackers.clarity && window.clarity !== undefined
             || trackers.matomo && (window._paq !== undefined || window.Matomo !== undefined || window.Piwik !== undefined)
@@ -163,6 +167,7 @@
     let current = snapshot(storageFailed ? pending() : read());
     let reloading = false;
     let pendingAudit = null;
+    let recoveringAudit = null;
     let ready = false;
     let markReady;
     const initialized = new Promise(resolve => { markReady = resolve; });
@@ -171,14 +176,21 @@
     let cleanupQueue = Promise.resolve();
     let presetQueue = Promise.resolve();
     let loadQueue = Promise.resolve();
+    let navigationQueue = Promise.resolve();
+    let navigating = false;
+    let navigationId = 0;
+    let navigation = null;
+    let previousUrl = window.location.href;
+    const initialContext = document.querySelector('meta[data-consent-page]')?.content ?? null;
     const records = new Map();
+    const templates = new WeakMap();
     const sources = new Map();
     const listeners = new Set();
     const revocationHooks = new Map();
     const revoking = new Set();
     const permits = (state, category) => category === 'necessary'
         || (validDecision(state) && config.categories.includes(category) && state.choices[category] === true);
-    const canRun = category => !reloading && !revoking.has(category) && permits(current, category);
+    const canRun = category => !reloading && !navigating && !revoking.has(category) && permits(current, category);
 
     function checkCategory(category) {
         if (!knownCategories.includes(category)) throw new TypeError(`Unknown consent category [${category}].`);
@@ -187,6 +199,7 @@
     function reload(reason, automatic = true) {
         if (reloading) return;
         reloading = true;
+        navigation?.resolve();
         if (storageFailed && !rememberDenial()) {
             report('storage-denial', new Error('A refusal cannot be remembered across reloads. Leave this document to stop already running code.'));
             emit('reload-required', { reason, automatic: false });
@@ -203,6 +216,98 @@
         emit('reload-required', { reason });
         try { window.location.reload(); }
         catch (error) { report('reload', error); }
+    }
+
+    function navigationReload(reason) {
+        if (reloading) return false;
+        ++auditRevision; // A stale receipt cannot install a grant in a different runtime context.
+        let automatic = false;
+        try {
+            const key = `consent:livewire-reload:${denialScope}:${window.location.href}`;
+            if (sessionStorage.getItem(key) !== '1') {
+                sessionStorage.setItem(key, '1');
+                automatic = sessionStorage.getItem(key) === '1';
+            }
+        } catch {}
+        report('livewire', new Error(reason === 'livewire-locale'
+            ? 'The persisted consent interface must be refreshed for the current language.'
+            : 'Livewire navigation requires a matching consent layout and runtime context.'));
+        reload(reason, automatic);
+        return false;
+    }
+
+    function checkPage() {
+        if (reloading) return false;
+        const markers = document.querySelectorAll('meta[data-consent-page]');
+        if (markers.length !== 1 || !initialContext || markers[0].content !== initialContext) return navigationReload('livewire-context');
+        const container = document.querySelector('[data-consent-container]');
+        if (container && container.dataset.consentContext !== initialContext) return navigationReload('livewire-context');
+        if (container && container.dataset.consentLocaleFixed !== 'true'
+            && container.dataset.consentLocale !== markers[0].dataset.consentLocale) return navigationReload('livewire-locale');
+        return true;
+    }
+
+    function retainNavigationSafety() {
+        if (storageFailed && !rememberDenial()) {
+            reload('storage-denial', false);
+            return false;
+        }
+        if (!storageFailed) clearDenial();
+        // Livewire 4 pushState drops fields outside state.alpine. Restore only the current recovery.
+        if (pendingAudit && !storageFailed) {
+            try { rememberAudit(pendingAudit.body, pendingAudit.next, pendingAudit.baseline); }
+            catch (error) { pendingAudit.error = error; report('audit', error); }
+        } else if (recoveringAudit && !storageFailed) {
+            try { storeAudit(recoveringAudit); } catch (error) { report('audit', error); }
+        } else if (!pendingAudit) clearSavedAudit();
+        return true;
+    }
+
+    if (config.livewire.enabled) {
+        document.addEventListener('livewire:navigate', event => {
+            if (event.defaultPrevented) return;
+            const full = config.livewire.navigation === 'reload'
+                || Boolean(runtimeScript?.nonce) && config.livewire.major !== 4;
+            if (!full && !reloading) return;
+            event.preventDefault();
+            if (reloading) return;
+            let target;
+            try { target = new URL(event.detail?.url, window.location.href); } catch { return; }
+            if (target.origin !== window.location.origin) return;
+            // A history-only refusal cannot be carried to another document by assigning its URL.
+            let durableDenial = !storageFailed;
+            try { durableDenial ||= sessionStorage.getItem(denialKey) === '1'; } catch {}
+            if (!durableDenial) { reload('storage-denial', false); return; }
+            window.location.assign(target.href);
+        });
+        document.addEventListener('livewire:navigating', event => {
+            if (reloading) return;
+            navigation?.resolve();
+            let resolve;
+            navigationQueue = new Promise(done => { resolve = done; });
+            navigation = { id: ++navigationId, resolve, previousUrl, completed: false };
+            navigating = true;
+            emit('navigating', { id: navigationId });
+            event.detail?.onSwap?.(() => { retainNavigationSafety(); checkPage(); });
+        });
+        document.addEventListener('livewire:navigated', () => {
+            if (!retainNavigationSafety()) return;
+            const visit = navigation;
+            if (!visit || visit.completed) return; // Initial load and same-document hash visits.
+            visit.completed = true;
+            const destination = { id: visit.id, url: window.location.href, title: document.title, previousUrl: visit.previousUrl };
+            (async () => {
+                if (!checkPage()) return;
+                sync();
+                await cleanupQueue;
+                if (navigation !== visit || reloading || !checkPage()) return;
+                navigating = false;
+                previousUrl = destination.url;
+                schedule();
+                emit('navigated', destination);
+            })().catch(error => { report('livewire', error); navigationReload('livewire-context'); })
+                .finally(() => visit.resolve());
+        });
     }
 
     function expireCookie(name, path, domain) {
@@ -338,6 +443,7 @@
 
     function clearSavedAudit(body) {
         if (body === undefined || pendingAudit?.body === body) pendingAudit = null;
+        if (body === undefined || recoveringAudit?.body === body) recoveringAudit = null;
         if (body !== undefined && savedAudit()?.body !== body) return;
         try { sessionStorage.removeItem(auditPendingKey); } catch {}
         try {
@@ -352,6 +458,10 @@
     function rememberAudit(body, next, baseline) {
         const value = { scope: denialScope, path: config.audit.path, body, next, baseline,
             deadline: Date.now() + 2 * config.audit.timeoutMs + 5000 };
+        storeAudit(value);
+    }
+
+    function storeAudit(value) {
         const serialized = JSON.stringify(value);
         try {
             sessionStorage.setItem(auditPendingKey, serialized);
@@ -396,10 +506,19 @@
     async function auditDecision(action, state, prepared = () => {}) {
         if (!config.audit) return;
         try {
-            const nodes = document.querySelectorAll('script[data-consent-notice]');
+            const roots = document.querySelectorAll('[data-consent-ui]');
+            const container = roots.length === 1 ? roots[0].closest('[data-consent-container]') : null;
+            if (roots.length > 1) throw new Error('Consent audit requires one active consent interface.');
+            const nodes = (container ?? document).querySelectorAll('script[data-consent-notice]');
             if (nodes.length !== 1) throw new Error('Consent audit requires exactly one signed notice from the banner.');
             const notice = JSON.parse(nodes[0].textContent);
             if (typeof notice?.payload !== 'string' || typeof notice.signature !== 'string') throw new Error('Invalid signed consent notice.');
+            if (container) {
+                const snapshot = JSON.parse(notice.payload);
+                if (snapshot.policy_version !== config.policyVersion || snapshot.services_version !== config.servicesVersion
+                    || snapshot.retention_days !== config.retentionDays || JSON.stringify(snapshot.categories) !== JSON.stringify(config.categories)
+                    || container.dataset.consentContext !== initialContext) throw new Error('The consent notice does not match the active runtime.');
+            }
             const body = JSON.stringify({ id: window.crypto.randomUUID(), notice, action, choices: state.choices });
             if (new TextEncoder().encode(body).byteLength > 61440) throw new Error('Consent audit request exceeds 60 KiB.');
             prepared(body);
@@ -425,6 +544,7 @@
             }
         } catch { clearSavedAudit(); return; }
         const revision = ++auditRevision;
+        recoveringAudit = saved;
         const canResume = () => revision === auditRevision && !reloading && savedAudit()?.body === saved.body && matches();
         // Replay the same explicit decision/ID, never a new decision based on a cookie read.
         operation(async () => {
@@ -554,18 +674,32 @@
 
     const attachedBlock = record => document.documentElement?.contains(record.template) === true;
 
+    function blockIdentity(template) {
+        const copy = template.cloneNode(true);
+        for (const script of copy.content?.querySelectorAll('script') ?? []) script.removeAttribute('nonce');
+        return `${template.getAttribute('data-consent-category')}\n${copy.innerHTML}`;
+    }
+
     function scan() {
         const ordered = [];
         for (const template of document.querySelectorAll(selector)) {
+            const discovered = templates.get(template);
+            if (discovered?.template === template && !validBlock(discovered)) continue;
             const id = template.getAttribute('data-consent-block');
             const category = template.getAttribute('data-consent-category');
             const signature = `${category}\n${template.innerHTML}`;
+            const identity = blockIdentity(template);
             if (records.has(id)) {
                 const record = records.get(id);
                 if (record.template === template) validBlock(record);
-                else if (!attachedBlock(record) && record.status === 'waiting' && !record.started
-                    && template.content?.nodeType === 11 && record.signature === signature && validBlock(record)) record.template = template;
-                if (record.signature !== signature && !template.hasAttribute('data-consent-conflict')) {
+                else if (!attachedBlock(record) && ['waiting', 'paused'].includes(record.status) && !record.started
+                    && template.content?.nodeType === 11 && record.identity === identity && validBlock(record)) {
+                    record.template = template;
+                    record.signature = signature;
+                    record.content = template.content.cloneNode(true);
+                    templates.set(template, record);
+                }
+                if (record.identity !== identity && !template.hasAttribute('data-consent-conflict')) {
                     template.setAttribute('data-consent-conflict', '');
                     report('duplicate', new Error('Consent block IDs must identify identical scripts and categories.'), id);
                 }
@@ -576,9 +710,10 @@
                 report('block', new Error('Invalid consent script block.'), id);
                 continue;
             }
-            const record = { id, category, signature, template, content: template.content.cloneNode(true),
+            const record = { id, category, signature, identity, template, content: template.content.cloneNode(true), cursor: 0,
                 status: 'waiting', started: false, nodes: [], cancels: new Set() };
             records.set(id, record);
+            templates.set(template, record);
             ordered.push(record);
         }
         return ordered;
@@ -698,11 +833,11 @@
     }
 
     async function drain() {
-        if (!ready || reloading) return;
-        while (!reloading) {
+        if (!ready || reloading || navigating) return;
+        while (!reloading && !navigating) {
             sync();
             // Async loading can add, move, or remove blocks. Select from the current DOM each time.
-            const record = scan().find(record => record.status === 'waiting' && attachedBlock(record)
+            const record = scan().find(record => ['waiting', 'paused'].includes(record.status) && attachedBlock(record)
                 && validBlock(record) && canRun(record.category));
             if (!record) break;
             record.status = 'loading';
@@ -711,10 +846,14 @@
                 const children = [...record.content.childNodes];
                 if (children.some(node => node.nodeType !== 8 && !(node.nodeType === 3 && node.textContent.trim() === '')
                     && !(node.nodeType === 1 && node.tagName === 'SCRIPT'))) throw new Error('Consent blocks support only script elements, whitespace, and comments.');
-                for (const original of children.filter(node => node.nodeType === 1)) {
+                const scripts = children.filter(node => node.nodeType === 1);
+                for (const original of scripts.slice(record.cursor)) {
+                    if (navigating) break;
                     if (!await execute(original, record)) break;
+                    record.cursor++;
                 }
-                if (record.status === 'loading') record.status = attachedBlock(record) && canRun(record.category) ? 'loaded' : 'stopped';
+                if (record.status === 'loading') record.status = navigating && attachedBlock(record) && permits(current, record.category)
+                    ? 'paused' : attachedBlock(record) && canRun(record.category) && record.cursor === scripts.length ? 'loaded' : 'stopped';
             } catch (error) {
                 record.status = 'failed';
                 if (error.name !== 'AbortError') report('script', error, record.id);
@@ -724,7 +863,7 @@
 
     function schedulePresets() {
         // Custom modules may await event helpers, so preset readiness must exclude those modules.
-        if (!ready || reloading) return presetQueue;
+        if (!ready || reloading || navigating) return presetQueue;
         presetQueue = presetQueue.then(async () => {
             await drainGoogle();
             await drainTrackers();
@@ -733,7 +872,7 @@
     }
 
     function schedule() {
-        if (!ready || reloading) return;
+        if (!ready || reloading || navigating) return;
         const presets = schedulePresets();
         loadQueue = loadQueue.then(async () => { await presets; await drain(); }).catch(error => report('loader', error));
     }
@@ -784,7 +923,7 @@
     }
 
     async function drainGoogle() {
-        if (!googleCommand || googleFailed || reloading) return;
+        if (!googleCommand || googleFailed || reloading || navigating) return;
         sync();
         const advanced = config.google.mode === 'advanced';
         const target = config.google.targets.find(target => advanced || canRun(target.category));
@@ -802,7 +941,7 @@
             }
             for (const target of config.google.targets) {
                 sync();
-                if (reloading || googleConfigured.has(target.id) || !advanced && !canRun(target.category)) continue;
+                if (reloading || navigating || googleConfigured.has(target.id) || !advanced && !canRun(target.category)) continue;
                 googleCommand('config', target.id, target.category === 'analytics'
                     ? { send_page_view: target.sendPageView, allow_google_signals: false, allow_ad_personalization_signals: false }
                     : { allow_ad_personalization_signals: false });
@@ -1329,10 +1468,10 @@
             await initialized;
             let previous;
             do {
-                previous = [operations, cleanupQueue, presetQueue, loadQueue, eventQueue];
+                previous = [operations, cleanupQueue, presetQueue, loadQueue, eventQueue, navigationQueue];
                 await Promise.all(previous);
             } while (previous[0] !== operations || previous[1] !== cleanupQueue || previous[2] !== presetQueue
-                || previous[3] !== loadQueue || previous[4] !== eventQueue);
+                || previous[3] !== loadQueue || previous[4] !== eventQueue || previous[5] !== navigationQueue);
             return snapshot(current);
         },
     };
@@ -1343,8 +1482,9 @@
         cleanCookies(knownCategories.filter(key => key !== 'necessary' && !permits(current, key)));
         schedule();
         new MutationObserver(changes => {
-            if (changes.some(change => [...change.addedNodes].some(node => node.nodeType === 1 && (node.matches(selector) || node.querySelector(selector))))) schedule();
-        }).observe(document.documentElement, { childList: true, subtree: true });
+            if (changes.some(change => change.type === 'attributes' && change.target.matches(selector)
+                || [...change.addedNodes].some(node => node.nodeType === 1 && (node.matches(selector) || node.querySelector(selector))))) schedule();
+        }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-consent-block', 'data-consent-category'] });
         markReady();
         emit('ready', { current: snapshot(current) });
     }

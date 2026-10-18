@@ -1,3 +1,7 @@
+[data-consent-container] {
+    display: contents;
+}
+
 .consent-ui {
     --consent-background: #ffffff;
     --consent-text: #182722;

@@ -3,6 +3,8 @@
     if (window.__consentUiLoaded) return;
     window.__consentUiLoaded = true;
     let controller = null;
+    let suspended = false;
+    let duplicateReported = false;
     const roots = '[data-consent-ui]';
 
     function mount(root) {
@@ -20,6 +22,9 @@
         let dismissed = false;
         let trigger = null;
         let lastError = '';
+        let destroyed = false;
+        let generation = 0;
+        let ignoreClose = false;
         const events = new AbortController();
         const on = (target, name, callback) => target.addEventListener(name, callback, { signal: events.signal });
         const announce = key => { status.textContent = root.dataset[`message${key}`] ?? ''; };
@@ -39,6 +44,7 @@
             }
         }
         function restoreFocus(preferred) {
+            if (destroyed || suspended) return;
             if (preferred?.isConnected && !preferred.closest('[hidden]') && !dialog.contains(preferred)) preferred.focus({ preventScroll: true });
             else if (!launcher.hidden) launcher.focus({ preventScroll: true });
         }
@@ -49,7 +55,9 @@
             restoreFocus(trigger);
         }
         function open(opener = document.activeElement) {
+            if (destroyed || suspended || !root.isConnected) return false;
             if (dialog.open) return true;
+            ignoreClose = false;
             selection(api.state());
             trigger = opener;
             try { dialog.showModal(); }
@@ -66,7 +74,9 @@
             if (focusedInside) restoreFocus(null);
         }
         async function save(action) {
-            if (busy) return;
+            if (busy || destroyed || suspended) return;
+            const revision = generation;
+            const active = () => !destroyed && root.isConnected && generation === revision;
             const focusedInside = banner.contains(document.activeElement) || dialog.contains(document.activeElement);
             if (!dialog.open) trigger = document.activeElement;
             busy = true;
@@ -79,12 +89,14 @@
                 if (action === 'accept') await api.acceptAll();
                 else if (action === 'reject') await api.rejectOptional();
                 else await api.choose(Object.fromEntries(fields.map(field => [field.dataset.consentCategory, field.checked])));
+                if (!active()) return;
                 dismissed = false;
                 announce('Saved');
                 close();
                 reveal();
                 if (focusedInside) restoreFocus(trigger);
             } catch {
+                if (!active()) return;
                 error(lastError || root.dataset.messageError);
                 // The choice was not saved. Keep a visible route to retry it, even after a same-tab denial.
                 dismissed = false;
@@ -93,6 +105,7 @@
                 launcher.hidden = true;
                 status.textContent = '';
             } finally {
+                if (!active()) return;
                 busy = false;
                 root.removeAttribute('aria-busy');
                 for (const button of root.querySelectorAll('[aria-disabled]')) button.removeAttribute('aria-disabled');
@@ -113,7 +126,7 @@
         on(form, 'submit', event => { event.preventDefault(); save('save'); });
         on(dialog, 'cancel', event => { event.preventDefault(); close(); });
         on(dialog, 'close', () => {
-            if (!dialog.open) {
+            if (!dialog.open && !ignoreClose && !destroyed && !suspended) {
                 const needsFocus = dialog.contains(document.activeElement) || document.activeElement === document.body;
                 reveal();
                 if (needsFocus) restoreFocus(trigger);
@@ -153,13 +166,42 @@
         fallback.hidden = true;
         selection(api.state());
         reveal();
-        return { root, open, destroy() { unsubscribe(); events.abort(); if (dialog.open) dialog.close(); } };
+        function reset() {
+            ++generation;
+            ignoreClose = true;
+            trigger = null;
+            busy = false;
+            dismissed = false;
+            if (dialog.open) dialog.close();
+            root.removeAttribute('aria-busy');
+            for (const button of root.querySelectorAll('[aria-disabled]')) button.removeAttribute('aria-disabled');
+            for (const field of fields) field.disabled = field.dataset.consentCategory === 'necessary';
+            selection(api.state());
+            status.textContent = '';
+            reveal();
+        }
+        return { root, open, reset,
+            intact: () => root.isConnected && root.querySelector('[data-consent-dialog]') === dialog
+                && root.querySelector('[data-consent-form]') === form && root.querySelector('[data-consent-launcher]') === launcher
+                && root.querySelector('[data-consent-banner]') === banner,
+            destroy() { destroyed = true; ++generation; unsubscribe(); events.abort(); if (dialog.open) dialog.close(); },
+        };
     }
 
     function boot() {
-        if (controller && !controller.root.isConnected) { controller.destroy(); controller = null; }
+        if (suspended) return;
+        const candidates = document.querySelectorAll(roots);
+        if (controller && (!controller.intact() || candidates.length !== 1)) { controller.destroy(); controller = null; }
+        if (candidates.length > 1) {
+            if (!duplicateReported) document.dispatchEvent(new CustomEvent('consent:error', { detail: {
+                code: 'ui', message: 'Only one consent interface is supported per document.', block: null,
+            } }));
+            duplicateReported = true;
+            return;
+        }
+        duplicateReported = false;
         if (!controller) {
-            const root = document.querySelector(roots);
+            const root = candidates[0];
             if (root) controller = mount(root);
         }
     }
@@ -174,10 +216,17 @@
         if (controller?.open(opener)) event.preventDefault();
     });
     document.addEventListener('consent:ready', boot);
+    document.addEventListener('consent:navigating', () => { suspended = true; controller?.reset(); });
+    document.addEventListener('consent:navigated', () => {
+        suspended = false;
+        boot();
+        controller?.reset();
+    });
     function start() {
         boot();
         new MutationObserver(changes => {
-            if (changes.some(change => [...change.addedNodes, ...change.removedNodes].some(node => node.nodeType === 1 && (node.matches(roots) || node.querySelector(roots))))) boot();
+            if (changes.some(change => controller?.root.contains(change.target)
+                || [...change.addedNodes, ...change.removedNodes].some(node => node.nodeType === 1 && (node.matches(roots) || node.querySelector(roots))))) boot();
         }).observe(document.documentElement, { childList: true, subtree: true });
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });

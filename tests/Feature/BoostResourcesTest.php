@@ -118,7 +118,7 @@ it('renders custom script examples inertly and accepts the documented presentati
 
     $examples = boostCodeExamples($scripts, 'blade');
     $html = Blade::render($examples[0]);
-    expect($html)->toContain('<template data-consent-block="site-statistics-loader" data-consent-category="analytics">', 'window.siteStatistics.start();');
+    expect($html)->toContain('<template data-consent-block="site-statistics-loader" data-consent-category="analytics"', 'window.siteStatistics.start();');
     foreach (array_slice($examples, 2) as $example) {
         expect(Blade::render($example, ['cspNonce' => 'example-nonce']))->toContain('nonce="example-nonce"', 'data-consent-theme="auto"');
     }
