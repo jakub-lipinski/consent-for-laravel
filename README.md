@@ -130,6 +130,10 @@ New optional grants wait for a database receipt; refusal and withdrawal take eff
 
 The package includes discoverable guidelines and the `consent-for-laravel-development` skill. In your application, run `php artisan boost:install`, select this package, and enable guidelines and skills for your agents. Existing Boost installations can add it through `php artisan boost:update --discover`. See the [Boost guide](https://consent.lipinskijakub.pl/docs/laravel-boost) for installation, generated files, reference contents, and custom overrides. Boost is optional and is not a package runtime dependency.
 
+## Livewire (unreleased)
+
+The development branch supports Livewire 3/4 component updates and `wire:navigate` through the same Blade components and browser API. The banner follows application-language changes, preserving saved choices and pairing translated UI with its audit notice. Livewire remains optional. See the [Livewire guide](docs/livewire.md) for versions, stable script IDs, persist, SPA measurements, CSP profiles and upgrade requirements. This feature has not been tagged or published yet.
+
 ## Documentation and updates
 
 The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) contains the complete configuration reference and guides:

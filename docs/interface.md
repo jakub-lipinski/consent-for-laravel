@@ -80,6 +80,8 @@ Serve the head before the UI. Both components accept a nonce; scripts and styles
 
 Only one UI root is supported per document. The component renders once per response. If a SPA replaces the entire root, the controller removes stale listeners and mounts the new root. Keep stable script block IDs for page fragments as described in the runtime guide. Locale-specific HTML caches must vary by locale.
 
+The unreleased [Livewire integration](livewire.md) protects the complete UI/notice container during ordinary morphs and replaces it when rendered presentation or language changes. Navigation closes an open dialog without saving its draft or restoring focus to the departing page. Persisted interfaces refresh safely when their app/config locale changes.
+
 ### Languages and custom translations
 
 Both variants ship `en`, `pl`, `de`, `fr`, `it`, `es`, and `pt` (European Portuguese), including preset purposes, accessible names, status/error messages, and the Advanced Google notice. The component locale takes priority over `ui.locale`, which takes priority over the app locale. Custom `lang/vendor/consent/{locale}/messages.php` and optional `services.php` dictionaries work without a package language allowlist. No publishing step is required to add these files.

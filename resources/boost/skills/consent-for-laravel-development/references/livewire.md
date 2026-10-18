@@ -1,0 +1,15 @@
+# Livewire
+
+Support is optional and currently unreleased. Use Livewire 3.8.10+ or 4.4.7+ with the package's existing Laravel/PHP requirements. Keep `<x-consent::head />` and one `<x-consent::banner />` in every participating shared layout. No consent Livewire component, `entangle`, frontend build or extra endpoint is required.
+
+`consent.livewire.enabled` defaults to true; `navigation` defaults to `auto` and also accepts `reload`. The adapter coordinates `wire:navigate`, redirects and history with the existing loader. Use explicit stable block IDs and ordinary script tags. They stay inert without permission and execute once per document, including across visits. Do not nest `@script`/`@assets` with `@consent`; Livewire owns those transports. The v4 preparation hook protects unindented gated scripts before single-file extraction.
+
+Leave `ui.locale=null` to follow `app()->setLocale()` before rendering. Navigation and component locale changes replace the presentation-keyed interface and signed notice together, preserving saved choices and expiry. Ordinary same-presentation morphs keep the draft. Explicit locale overrides remain intentional. A persisted app/config-locale interface refreshes the full document if the incoming locale differs. Preserve the complete UI+notice container in a layout-level persist wrapper; use normal remount for other presentation changes.
+
+Activations pause during swaps. Changed runtime configuration/assets require bounded full-reload recovery. Active withdrawal keeps the existing full reload rules; SPA navigation cannot stop running code. Audited grants wait for receipts and preserve the notice captured at invocation. A delayed receipt cannot override a newer refusal. Navigation never records a decision.
+
+`consent:navigated` on `document` carries `{ id, url, title, previousUrl }` once per completed page swap, excluding initial load, prefetch, canceled visits, morphs and hash-only changes. It sends no measurement. Register an application listener once and use [browser helpers](browser-api.md) for explicit measurement. Coordinate GA4 manual page views with enhanced history tracking to avoid duplication. Do not replay denied measurements after acceptance.
+
+Use Livewire 4's CSP-safe build when excluding `unsafe-eval`. Auto mode uses full visits for nonce-bearing Livewire 3/unknown-major runtimes. Preserve the initial document nonce and do not repair intentionally invalid nonces. Livewire DOMParser style processing can require exact static-style hashes in addition to nonces; test the actual application's CSP and published CSS. Merge current views, refresh published assets and clear compiled Livewire/Blade caches on upgrade.
+
+Verify actual navigation and component updates, languages with saved/pending choices, duplicate prevention, delayed audit/withdrawal, Back/Forward, native dialog focus and narrow enlarged-text layouts. Follow [verification](verification.md); jsdom alone does not establish Livewire/CSP/modules/modality behavior.

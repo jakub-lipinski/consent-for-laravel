@@ -1,6 +1,6 @@
 # Laravel Boost
 
-Consent for Laravel ships a short always-loaded guideline and one task-focused skill with twelve supporting references. Laravel Boost discovers these resources from the installed Composer package; no separate consent command, asset publishing, or runtime dependency on Boost is required.
+Consent for Laravel ships a short always-loaded guideline and one task-focused skill with thirteen supporting references. Laravel Boost discovers these resources from the installed Composer package; no separate consent command, asset publishing, or runtime dependency on Boost is required.
 
 ## Install in Your Application
 
@@ -32,6 +32,7 @@ resources/boost/
             ├── browser-api.md
             ├── php-api.md
             ├── audit.md
+            ├── livewire.md
             ├── verification.md
             └── integrations/
                 ├── google.md
@@ -55,7 +56,7 @@ your-application/
 ├── boost.json
 ├── .agents/skills/consent-for-laravel-development/
 │   ├── SKILL.md
-│   └── references/              # All twelve reference files
+│   └── references/              # All thirteen reference files
 └── vendor/jakub-lipinski/consent-for-laravel/resources/boost/
     ├── guidelines/core.blade.php
     └── skills/consent-for-laravel-development/

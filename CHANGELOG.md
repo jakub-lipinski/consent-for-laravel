@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add optional Livewire 3/4 lifecycle coordination for navigation, redirects, history, morphs and dynamic components, preserving ordered and deduplicated consent gates.
+- Update the banner and paired audit notice after navigation or component locale changes, retaining choices and expiry. Protect unchanged UI drafts during morphs and discard them on page swaps.
+- Protect Livewire 4 single-file gated scripts before extraction, and provide stable template keys without requiring Livewire in production dependencies.
+- Validate destination runtime/asset context, preserve storage-denial/audit recovery across history writes, and keep full active-withdrawal reloads.
+- Add `consent:navigated` for explicitly managed SPA measurements, optional Livewire settings, browser/real-framework tests, CI and Boost guidance. No automatic analytics page views are added.
+- See the [Livewire guide](docs/livewire.md). No version bump or release tag is included.
+
 ## v1.4.1 - Bug fixes and runtime stability
 
 - Stop changed consent blocks from executing under their previously discovered category, including mutations during external loading.

@@ -45,6 +45,7 @@ Read the relevant reference, rather than every file:
 | Build consent controls, observe changes, synchronize choices, or implement cleanup | [Browser API](references/browser-api.md) |
 | Read or persist preferences in PHP | [PHP API](references/php-api.md) |
 | Enable database history, configure retention, or investigate audit failures | [Audit](references/audit.md) |
+| Integrate Livewire navigation/components, language changes, persist, or SPA measurements | [Livewire](references/livewire.md) |
 | Configure GA4/Google Ads or send Google events/conversions | [Google](references/integrations/google.md) |
 | Configure Meta Pixel or send Meta standard/custom events | [Meta Pixel](references/integrations/meta-pixel.md) |
 | Configure recordings, heatmaps, Clarity events, or advertising signals | [Microsoft Clarity](references/integrations/clarity.md) |
