@@ -1,0 +1,80 @@
+name: Livewire compatibility
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+        laravel: ['12.*', '13.*']
+        livewire: ['3.8.10', '4.4.7', '^3.8.10', '^4.4.7']
+        include:
+          - laravel: '12.*'
+            testbench: '^10.0'
+          - laravel: '13.*'
+            testbench: '^11.0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, dom, fileinfo, sqlite3, pdo_sqlite
+          coverage: none
+          tools: composer:v2
+      - run: composer require --dev "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" "livewire/livewire:${{ matrix.livewire }}" --no-update --no-interaction
+      - run: composer update --prefer-dist --no-interaction
+      - run: composer test
+
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        laravel: ['12', '13']
+        livewire: ['3.8.10', '4.4.7']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, fileinfo, sqlite3, pdo_sqlite
+          coverage: none
+          tools: composer:v2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Prepare a disposable host outside the checkout
+        env:
+          CONSENT_HOST: ${{ runner.temp }}/consent-host
+          LARAVEL_MAJOR: ${{ matrix.laravel }}
+          LIVEWIRE_VERSION: ${{ matrix.livewire }}
+        run: |
+          composer create-project laravel/laravel "$CONSENT_HOST" "^$LARAVEL_MAJOR.0" --prefer-dist --no-interaction
+          cd "$CONSENT_HOST"
+          composer config repositories.consent "{\"type\":\"path\",\"url\":\"$GITHUB_WORKSPACE\",\"options\":{\"symlink\":true}}"
+          composer require jakub-lipinski/consent-for-laravel:@dev "livewire/livewire:$LIVEWIRE_VERSION" --no-interaction
+          php "$GITHUB_WORKSPACE/tests/Browser/prepare-host.php" "$CONSENT_HOST"
+          php artisan migrate --force
+          cd public
+          php -S 127.0.0.1:8715 "$CONSENT_HOST/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php" > "$RUNNER_TEMP/consent-host.log" 2>&1 &
+      - name: Wait for the host
+        run: node -e 'let n=0; const check=()=>fetch("http://127.0.0.1:8715/en/a").then(r=>{if(!r.ok)throw Error(r.status)}).catch(e=>{if(++n>30)process.exit(1);setTimeout(check,1000)});check()'
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: livewire-${{ matrix.laravel }}-${{ matrix.livewire }}
+          path: |
+            /tmp/consent-livewire-browser-results
+            ${{ runner.temp }}/consent-host.log
