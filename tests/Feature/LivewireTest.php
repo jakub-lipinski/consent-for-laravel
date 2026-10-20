@@ -92,6 +92,92 @@ it('preserves inline PHP and quoted directives within gated scripts', function (
     expect(Blade::render((new LivewireBladePrecompiler)($source)))->toBe(Blade::render($source));
 });
 
+it('preserves server expressions containing script delimiters and consent names', function (string $body) {
+    Blade::directive('serializeConsentFixture', fn (string $expression): string => '<?php echo json_encode('.$expression.', JSON_HEX_TAG); ?>');
+    $source = "<div>\n@consent('analytics', 'serialized-html')\n<script>".$body."</script>\n<script>window.following = true;</script>\n@endconsent\n</div>";
+    $expected = Blade::render($source);
+    $prepared = app(LivewireBladePrecompiler::class)($source);
+
+    expect(Blade::render($prepared))->toBe($expected)
+        ->and($prepared)->not->toMatch('/(?:^|\n)<script\b/');
+})->with([
+    'json opening delimiter' => [<<<'BLADE'
+        const value = @json('</script><script>');
+        BLADE],
+    'json quoted consent name' => [<<<'BLADE'
+        const value = @json('</script> @endconsent');
+        BLADE],
+    'json double quotes and parentheses' => [<<<'BLADE'
+        const value = @json("</script><script> ) @consent('analytics')");
+        BLADE],
+    'json multiline script literal' => [<<<'BLADE'
+        const value = @json('
+        </script>
+        <script>window.literal = true;</script>
+        @endconsent');
+        BLADE],
+    'js expression' => [<<<'BLADE'
+        const value = @js('</script><script> @endconsent');
+        BLADE],
+    'js nested arguments' => [<<<'BLADE'
+        const value = @js(str_replace(')', '', '</script><script>)'));
+        BLADE],
+    'short PHP echo' => [<<<'BLADE'
+        const value = <?= json_encode('</script><script> @endconsent', JSON_HEX_TAG) ?>;
+        BLADE],
+    'PHP block and comment' => [<<<'BLADE'
+        <?php /* </script><script> @endconsent */ $value = '</script><script> @endconsent'; ?> const value = @json($value);
+        BLADE],
+    'PHP nowdoc' => [<<<'BLADE'
+        <?php $value = <<<'HTML'
+        </script><script> @endconsent
+        HTML;
+        echo json_encode($value, JSON_HEX_TAG); ?>
+        BLADE],
+    'escaped echo' => [<<<'BLADE'
+        const value = "{{ '</script><script> @endconsent' }}";
+        BLADE],
+    'raw echo' => [<<<'BLADE'
+        const value = {!! json_encode('</script><script> @endconsent', JSON_HEX_TAG) !!};
+        BLADE],
+    'inline PHP directive' => [<<<'BLADE'
+        @php($value = '</script><script> @endconsent') const value = @json($value);
+        BLADE],
+    'block PHP directive' => [<<<'BLADE'
+        @php $value = '</script><script> @endconsent'; @endphp const value = @json($value);
+        BLADE],
+    'Blade comment' => [<<<'BLADE'
+        {{-- </script><script> @endconsent @script --}} const value = @json('safe');
+        BLADE],
+    'PHP comment inside arguments' => [<<<'BLADE'
+        const value = @json(/* </script><script> @endconsent */ '<script>');
+        BLADE],
+    'conditional arguments' => [<<<'BLADE'
+        @if (str_contains('</script><script> @endconsent', 'script')) const value = @json('safe'); @endif
+        BLADE],
+    'custom directive arguments' => [<<<'BLADE'
+        const value = @serializeConsentFixture('</script><script> @endconsent');
+        BLADE],
+    'escaped directive' => [<<<'BLADE'
+        /* @@json('<script> @endconsent') */ const value = @json('safe');
+        BLADE],
+    'verbatim text' => [<<<'BLADE'
+        /* @verbatim @json('<script> @endconsent') @endverbatim */ const value = @json('safe');
+        BLADE],
+]);
+
+it('leaves unrelated source unchanged when consent names are only server-side data', function () {
+    $source = <<<'BLADE'
+        <div>
+        @json('</script><script> @consent @endconsent')
+        <script>const value = @js('</script><script> @consent @endconsent');</script>
+        @verbatim @consent('literal') @endverbatim
+        </div>
+        BLADE;
+
+    expect(app(LivewireBladePrecompiler::class)($source))->toBe($source);
+});
+
 it('rejects Livewire execution transports nested with consent', function (string $source) {
     expect(fn () => (new LivewireBladePrecompiler)($source))->toThrow(InvalidArgumentException::class);
 })->with([

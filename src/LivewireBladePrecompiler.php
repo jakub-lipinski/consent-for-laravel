@@ -2,11 +2,16 @@
 
 namespace ConsentForLaravel\ConsentForLaravel;
 
+use Illuminate\View\Compilers\BladeCompiler;
 use InvalidArgumentException;
 
-/** Keeps Livewire's single-file script extraction outside consent blocks. */
+/** Keeps Livewire's script extraction outside consent blocks. */
 final class LivewireBladePrecompiler
 {
+    private const SERVER_TOKENS = '\{\{--|\{!!|\{\{|<\?(?:php\b|=)|\B@\w+(?:::\w+)?\b';
+
+    public function __construct(private readonly ?BladeCompiler $blade = null) {}
+
     public function __invoke(string $source): string
     {
         if (! str_contains($source, '@consent')) {
@@ -16,7 +21,7 @@ final class LivewireBladePrecompiler
         $consent = false;
         $livewire = [];
         $output = '';
-        $pattern = '~\{\{--|\{!!|\{\{|<\?(?:php\b|=)|@(?:verbatim|php|consent|endconsent|script|endscript|assets|endassets)\b|<script\b~i';
+        $pattern = '~'.self::SERVER_TOKENS.'|<script\b~i';
         while (preg_match($pattern, $source, $match, PREG_OFFSET_CAPTURE, $offset)) {
             [$token, $start] = $match[0];
             $output .= substr($source, $offset, $start - $offset);
@@ -28,25 +33,11 @@ final class LivewireBladePrecompiler
                 continue;
             }
             $lower = strtolower($token);
-            if ($lower === '{{--') {
-                $end = $this->through($source, '--}}', $end);
-            } elseif ($lower === '{!!' || $lower === '{{') {
-                $end = $this->through($source, $lower === '{!!' ? '!!}' : '}}', $end);
-            } elseif ($lower === '@verbatim') {
-                $end = $this->through($source, '@endverbatim', $end);
-            } elseif (str_starts_with($lower, '<?')) {
-                $end = $this->phpEnd(substr($source, $start), $start);
-            } elseif ($lower === '@php') {
-                $next = $end + strspn($source, " \t\r\n", $end);
-                $end = ($source[$next] ?? '') === '(' ? $this->expressionEnd($source, $next)
-                    : $this->phpEnd('<?php '.substr($source, $end), $end - 6, true);
-            } elseif ($lower === '<script') {
-                if (! preg_match('~</script\s*>~i', $source, $closing, PREG_OFFSET_CAPTURE, $end)) {
-                    throw new InvalidArgumentException('A script in a Livewire view requires a closing script tag.');
-                }
-                $end = $closing[0][1] + strlen($closing[0][0]);
+            if ($lower === '<script') {
+                $end = $this->scriptEnd($source, $end);
                 $script = substr($source, $start, $end - $start);
-                $output .= $consent ? $this->protectScript($script) : $script;
+                // Keep expressions opaque to extraction, then restore them before normal Blade compilation.
+                $output .= $consent ? '{{-- consent-livewire-script:'.base64_encode($script).' --}}' : $script;
                 $offset = $end;
 
                 continue;
@@ -69,6 +60,8 @@ final class LivewireBladePrecompiler
                 $livewire[] = $lower;
             } elseif ($lower === '@endscript' || $lower === '@endassets') {
                 array_pop($livewire);
+            } else {
+                $end = $this->serverEnd($source, $start, $token);
             }
             $output .= substr($source, $start, $end - $start);
             $offset = $end;
@@ -78,6 +71,65 @@ final class LivewireBladePrecompiler
         }
 
         return $output.substr($source, $offset);
+    }
+
+    public function restore(string $source): string
+    {
+        if (! str_contains($source, '{{-- consent-livewire-script:')) {
+            return $source;
+        }
+
+        return preg_replace_callback('~\{\{-- consent-livewire-script:([A-Za-z0-9+/=]+) --\}\}~', static function (array $match): string {
+            $script = base64_decode($match[1], true);
+
+            return $script === false ? $match[0] : $script;
+        }, $source) ?? $source;
+    }
+
+    private function scriptEnd(string $source, int $offset): int
+    {
+        $pattern = '~'.self::SERVER_TOKENS.'|</script\s*>~i';
+        while (preg_match($pattern, $source, $match, PREG_OFFSET_CAPTURE, $offset)) {
+            [$token, $start] = $match[0];
+            if (str_starts_with($token, '</')) {
+                return $start + strlen($token);
+            }
+            $offset = $this->serverEnd($source, $start, $token);
+        }
+
+        throw new InvalidArgumentException('A script in a Livewire view requires a closing script tag.');
+    }
+
+    private function serverEnd(string $source, int $start, string $token): int
+    {
+        $end = $start + strlen($token);
+        $lower = strtolower($token);
+        if ($lower === '{{--') {
+            return $this->through($source, '--}}', $end);
+        }
+        if ($lower === '{!!' || $lower === '{{') {
+            return $this->through($source, $lower === '{!!' ? '!!}' : '}}', $end);
+        }
+        if (str_starts_with($lower, '<?')) {
+            return $this->phpEnd(substr($source, $start), $start);
+        }
+        if ($start > 0 && $source[$start - 1] === '@') {
+            return $end;
+        }
+        if ($lower === '@verbatim') {
+            return $this->through($source, '@endverbatim', $end);
+        }
+        $next = $end + strspn($source, " \t\r\n", $end);
+        if ($lower === '@php' && ($source[$next] ?? '') !== '(') {
+            return $this->phpEnd('<?php '.substr($source, $end), $end - 6, true);
+        }
+        $name = substr($token, 1);
+        if (($source[$next] ?? '') === '(' && (method_exists($this->blade ?? BladeCompiler::class, 'compile'.ucfirst($name))
+            || array_key_exists($name, $this->blade?->getCustomDirectives() ?? []))) {
+            return $this->expressionEnd($source, $next);
+        }
+
+        return $end;
     }
 
     private function through(string $source, string $closing, int $offset): int
@@ -103,7 +155,7 @@ final class LivewireBladePrecompiler
                 return $position;
             }
         }
-        throw new InvalidArgumentException('Unclosed consent directive arguments.');
+        throw new InvalidArgumentException('Unclosed Blade directive arguments in a Livewire view.');
     }
 
     private function phpEnd(string $source, int $offset, bool $blade = false): int
@@ -121,42 +173,5 @@ final class LivewireBladePrecompiler
         }
 
         return $offset + strlen($source);
-    }
-
-    private function protectScript(string $source): string
-    {
-        // PHP/Blade expressions stay intact; their output is already invisible to extraction.
-        $offset = 0;
-        $result = '';
-        $pattern = '~\{\{--|\{!!|\{\{|<\?(?:php\b|=)|@(?:verbatim|php)\b|<script\b~i';
-        while (preg_match($pattern, $source, $match, PREG_OFFSET_CAPTURE, $offset)) {
-            [$token, $start] = $match[0];
-            $result .= substr($source, $offset, $start - $offset);
-            $end = $start + strlen($token);
-            $lower = strtolower($token);
-            if ($lower === '<script') {
-                $result .= '{!! '.var_export($token, true).' !!}';
-                $offset = $end;
-
-                continue;
-            }
-            if ($lower === '{{--') {
-                $end = $this->through($source, '--}}', $end);
-            } elseif ($lower === '{!!' || $lower === '{{') {
-                $end = $this->through($source, $lower === '{!!' ? '!!}' : '}}', $end);
-            } elseif ($lower === '@verbatim' && ($source[$start - 1] ?? '') !== '@') {
-                $end = $this->through($source, '@endverbatim', $end);
-            } elseif (str_starts_with($lower, '<?')) {
-                $end = $this->phpEnd(substr($source, $start), $start);
-            } elseif ($lower === '@php' && ($source[$start - 1] ?? '') !== '@') {
-                $next = $end + strspn($source, " \t\r\n", $end);
-                $end = ($source[$next] ?? '') === '(' ? $this->expressionEnd($source, $next)
-                    : $this->phpEnd('<?php '.substr($source, $end), $end - 6, true);
-            }
-            $result .= substr($source, $start, $end - $start);
-            $offset = $end;
-        }
-
-        return $result.substr($source, $offset);
     }
 }

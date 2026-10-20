@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Livewire\Component;
 use Livewire\Livewire;
@@ -70,3 +71,42 @@ it('protects actual Livewire single-file extraction before Blade compilation', f
         File::deleteDirectory($directory);
     }
 })->skip(fn () => ! class_exists(Component::class) || ! method_exists(app('livewire'), 'addComponent'), 'Livewire 4 single-file compiler.');
+
+it('renders serialized script literals through actual Livewire file compilers', function (string $format, string $value, bool $navigation) {
+    config(['consent.livewire.enabled' => $navigation]);
+    $directory = sys_get_temp_dir().'/consent-serialized-'.bin2hex(random_bytes(6));
+    File::makeDirectory($directory);
+    $class = '<?php new class extends \\Livewire\\Component { public int $count = 0; }; ?>';
+    $view = str_replace('__VALUE__', var_export($value, true), <<<'BLADE'
+        <div>
+        @consent('analytics', 'serialized-'.$count)
+        <script>window.serialized = @json(__VALUE__);</script>
+        @endconsent
+        </div>
+        BLADE);
+    $expected = Blade::render('<script>window.serialized = @json('.var_export($value, true).');</script>');
+    if ($format === 'single') {
+        $path = $directory.'/single.blade.php';
+        File::put($path, $class."\n".$view);
+    } else {
+        $path = $directory.'/multi';
+        File::makeDirectory($path);
+        File::put($path.'/multi.php', $class);
+        File::put($path.'/multi.blade.php', $view);
+    }
+
+    try {
+        app('livewire')->addComponent('consent-serialized-test', viewPath: $path);
+        $component = Livewire::test('consent-serialized-test')
+            ->assertSeeHtml('data-consent-block="serialized-0"')
+            ->assertSeeHtml($expected);
+        expect(method_exists($component->instance(), 'scriptModuleSrc'))->toBeFalse();
+        $component->set('count', 1)->assertSeeHtml('data-consent-block="serialized-1"')->assertSeeHtml($expected);
+        expect($component->effects['scripts'] ?? [])->toBe([]);
+    } finally {
+        File::deleteDirectory($directory);
+    }
+})->with(['single', 'multi'])->with([
+    'script delimiters' => ['</script><script>'],
+    'multiline consent names' => ["</script>\n<script>window.literal = true;</script>\n@endconsent"],
+])->with([true, false])->skip(fn () => ! class_exists(Component::class) || ! method_exists(app('livewire'), 'addComponent'), 'Livewire 4 file compilers.');

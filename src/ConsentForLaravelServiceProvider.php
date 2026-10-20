@@ -96,10 +96,12 @@ class ConsentForLaravelServiceProvider extends PackageServiceProvider
         $blade->directive('consent', fn (string $expression): string => '<?php echo app(\\'.ScriptRenderer::class.'::class)->open('.$expression.'); ?>');
         $blade->directive('endconsent', fn (): string => '</template>');
 
-        $this->callAfterResolving('livewire', function (object $livewire): void {
+        $precompiler = $this->app->make(LivewireBladePrecompiler::class);
+        $blade->prepareStringsForCompilationUsing([$precompiler, 'restore']);
+        $this->callAfterResolving('livewire', function (object $livewire) use ($precompiler): void {
             // Inertness must also hold when navigation coordination is disabled.
             if (method_exists($livewire, 'prepareViewsForCompilationUsing')) {
-                $livewire->prepareViewsForCompilationUsing($this->app->make(LivewireBladePrecompiler::class));
+                $livewire->prepareViewsForCompilationUsing($precompiler);
             }
         });
 
