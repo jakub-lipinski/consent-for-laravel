@@ -43,6 +43,10 @@ Run the applicable scenarios in a disposable application/test browser:
 | Failed audit or late acceptance receipt after refusal | No new grant is revived; local denial remains |
 | Delayed audit receipt after another tab changes preferences | Newer saved refusal, partial selection, or cookie removal is preserved before polling and after refresh; denied SDKs make no requests |
 | Mixed audited change with active withdrawal reload | Immediate denial; same event retried without duplicate rows; new grant waits for receipt |
+| TikTok readiness across Livewire navigation | Readiness before/during/after a swap initializes once; paused calls stay discarded; withdrawal and failures still stop activation |
+| Gated Livewire 4 scripts with serialized tag-like values | Blade expressions remain intact; single-file and multi-file blocks stay inert until permission |
+| Many removed SPA fragments | Detached DOM and completed execution copies are collectible while stable IDs, source deduplication, and revocation history remain effective |
+| Inherited theme with a site switch | The palette follows the ancestor's `color-scheme`; system preference does not override an explicit host scheme; open drafts and saved expiry remain intact |
 | Changed, moved, or detached waiting blocks | Mutations stop activation; connected blocks follow current DOM order; detached blocks make no requests |
 | Failed audit when adding a category to an existing grant | Earlier permission can remain active; new permission stays denied; UI error remains neutral and retryable |
 
@@ -51,6 +55,8 @@ Google Advanced intentionally allows enabled Google tags/cookieless pings in pen
 For measurements, inspect the actual destination, name, ID/label, money/currency/product fields, number of events, and application success timing. For SPA changes, verify the initial route and subsequent routes without duplicating SDK/account automatic tracking. Use provider reporting/diagnostics when the real account is available; distinguish those checks from intercepted SDK tests or mocks.
 
 For custom scripts, verify library-before-init order, module imports/top-level await, deduplication, nonce inheritance, and cancellation. For audit, inspect all four explicit actions, original translated notice snapshots, receipt failures, protected history identity cookies, and pruning. Rendering/reading/measuring must not append decisions.
+
+Memory checks need native garbage collection or heap-retainer inspection with a comparable control. A remount count alone does not prove that detached DOM is collectible. After collection, verify identical unstarted replacements, once-per-document activation, external-source deduplication, and withdrawal of code whose original template disappeared.
 
 For interface changes, check the relevant variants/themes/positions/languages, longer custom wording, keyboard opening/Tab/Shift+Tab/Escape/focus return, custom palette contrast, 320-pixel reflow, and 200% text resizing in a browser. Use accessibility automation as an additional check, not evidence of native modality or visual layout by itself.
 

@@ -140,7 +140,7 @@ The [documentation website](https://consent.lipinskijakub.pl/docs/introduction) 
 - [Persistence](https://consent.lipinskijakub.pl/docs/persistence), [withdrawal](https://consent.lipinskijakub.pl/docs/withdrawal), and [security](https://consent.lipinskijakub.pl/docs/security).
 - [Upgrading](https://consent.lipinskijakub.pl/docs/upgrading), including earlier VCS installs, and [troubleshooting](https://consent.lipinskijakub.pl/docs/troubleshooting).
 
-Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. See the [upgrade guide](https://consent.lipinskijakub.pl/docs/upgrading#cross-tab-audit-fix) for the v1.5.1 audit fix, published resources, and earlier updates. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
+Update within your application's allowed Composer constraint, preserve your published customizations, commit the application's lock file, and refresh deployment caches. See the [upgrade guide](https://consent.lipinskijakub.pl/docs/upgrading#navigation-fixes-and-inherited-themes) for the v1.5.2 navigation fixes, inherited theme, published resources, and earlier updates. The package's source-oriented guides remain in [docs](docs/interface.md); release history is in [CHANGELOG.md](CHANGELOG.md).
 
 The browser-readable preference cookie is user-editable and must not be used for authorization or an audit trail. The package provides consent tooling; it does not certify legal compliance or the accessibility of your host website. Describe actual purposes and test the integrated application.
 

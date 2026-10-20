@@ -75,6 +75,8 @@ Supply one or more of these keys as lowercase 64-character hexadecimal SHA-256 d
 
 The local stub starts held/revoked; SDK loading is additionally gated. Current consent is reapplied before measurements. Marketing withdrawal revokes before change listeners, cancels pending events, and requires reload after active/in-flight loading.
 
+With Livewire, a temporary navigation pause preserves SDK readiness and resumes initialization once after a compatible visit with a current marketing grant. Calls made during navigation are discarded. SDK failure, expiry, withdrawal, and bounded waits for an unready SDK remain authoritative.
+
 Cleanup declares `_ttp`, `ttclid`, `ttcsid`, `_tt_enable_cookie`, and `ttcsid_` names at the configured scope. These scope settings describe cleanup, not TikTok's native cookie scope. Other paths/domains, plugins, HttpOnly cookies, and TikTok/Pangle third-party cookies require appropriate owner handling; already dispatched data cannot be recalled.
 
 ## Verification

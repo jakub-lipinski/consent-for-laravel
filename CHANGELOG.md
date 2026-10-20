@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.5.2 - Navigation fixes and inherited themes
+
+- Add `ui.theme=inherit` to follow the host page's CSS `color-scheme`, using the configured light/dark palettes without theme JavaScript or preference storage. Browsers without `light-dark()` keep a light fallback.
+- Preserve TikTok SDK readiness across Livewire navigation, resuming once after a compatible visit without replaying paused measurements or duplicating initialization.
+- Preserve Blade/PHP expressions containing script-like literals during gated Livewire 4 single-file and multi-file component preparation.
+- Release detached template/page DOM and completed execution copies while retaining block identities, external-source deduplication, and active revocation history.
+- Add native browser and runtime regressions for navigation timing, serialized expressions, garbage collection, inherited themes, CSP, and existing CSS overrides.
+- Existing APIs, default configuration, cookie schema, service fingerprints, and saved-decision lifetimes remain compatible. Refresh/cache-bust published `consent.js` and `consent.css`, and clear compiled views.
+- See the [release notes](docs/releases/v1.5.2.md) and [upgrade instructions](https://consent.lipinskijakub.pl/docs/upgrading#navigation-fixes-and-inherited-themes).
+
 ## v1.5.1 - Audited consent across tabs
 
 - Preserve a newer saved refusal, partial selection, or withdrawal from another tab when an older audit acceptance receipt arrives late.

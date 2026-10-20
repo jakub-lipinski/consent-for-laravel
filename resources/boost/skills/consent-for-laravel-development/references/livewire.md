@@ -31,7 +31,7 @@ Register purposes globally. Use explicit stable IDs and ordinary script tags in 
 
 The source is illustrative. Keep each ID's category and code stable. Identical blocks and SDKs execute once per document, including across navigation/history. Removed blocks cannot start their remaining scripts. Preserved unchanged blocks pause during swaps and resume afterward. Per-mount widgets need application-owned lifecycle/cleanup and permission checks before optional work.
 
-Do not nest `@script`/`@assets` with `@consent`; Livewire owns those separate execution transports. The v4 preparation hook protects ordinary gated script tokens before single-file extraction. Separate modules, direct vendor calls and server actions are not automatically gated.
+Do not nest `@script`/`@assets` with `@consent`; Livewire owns those separate execution transports. The v4 preparation hook protects ordinary gated script tokens before single-file extraction. Blade/PHP expressions inside gated scripts remain available to normal Blade compilation, including `@json` and `@js` values containing script-like text. Separate modules, direct vendor calls and server actions are not automatically gated.
 
 ## Languages and Interface State
 
