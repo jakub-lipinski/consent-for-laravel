@@ -19,7 +19,16 @@ Edit selected entries inside `consent.ui`, keeping the others:
 'dark_colors' => ['accent' => '#8DD8B4', 'accent_text' => '#10251B'],
 ```
 
-Variants are `standard` and `compact`; positions are `bottom-left`, `bottom-right`, and `bottom-center`; themes are `light`, `dark`, and `auto`. Auto follows CSS `prefers-color-scheme`; there is no visitor theme selector. Component props can override presentation, for example `<x-consent::banner variant="compact" locale="pl" />`.
+Variants are `standard` and `compact`; positions are `bottom-left`, `bottom-right`, and `bottom-center`; themes are `light`, `dark`, `auto`, and `inherit`. Auto follows CSS `prefers-color-scheme`; there is no visitor theme selector. Component props can override presentation, for example `<x-consent::banner variant="compact" locale="pl" />`.
+
+Use `inherit` when the application owns its theme switch. It selects the configured light/dark palette using the nearest ancestor's CSS `color-scheme`, including live changes and modal dialogs. Set that property in the application's existing theme rules; the package does not infer a scheme from class names or attributes. For a root `.dark` selector:
+
+```css
+:root { color-scheme: light; }
+:root.dark { color-scheme: dark; }
+```
+
+A host using `color-scheme: light dark` delegates the selection to the browser. An unspecified scheme or a browser without CSS `light-dark()` support uses the light palette. No theme JavaScript, preference storage, or consent reset is needed. Refresh/cache-bust published `consent.css` when enabling this mode after a package update.
 
 Both palettes accept selected six-digit HEX keys: `background`, `text`, `muted`, `accent`, `accent_text`, `border`, `control`, and `focus`. Missing/invalid entries inherit their palette's defaults. Light overrides are not transformed into dark colors. Diagnostics preserve chosen colors, check both palettes, and suppress identical warnings for 72 hours through the application's default cache; suppression across requests requires a suitable persistent cache.
 
@@ -67,7 +76,7 @@ Inspect the bundled version before editing `resources/views/vendor/consent`. Pre
 
 ## Verification
 
-Check both variants and relevant light/dark/auto states, all application languages, longer labels, keyboard opening/Tab/Shift+Tab/Escape, focus return, 320-pixel reflow, and 200% text resizing. Verify contrast for customized palettes in the browser. Automated accessibility checks supplement these observations. If auditing is enabled, verify the stored notice contains the customized translated interface.
+Check both variants and relevant light/dark/auto/inherit states, all application languages, longer labels, keyboard opening/Tab/Shift+Tab/Escape, focus return, 320-pixel reflow, and 200% text resizing. Verify contrast for customized palettes in the browser. Automated accessibility checks supplement these observations. If auditing is enabled, verify the stored notice contains the customized translated interface.
 
 ## Common Pitfalls
 

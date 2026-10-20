@@ -114,15 +114,21 @@ $write('resources/views/fixture.blade.php', <<<'BLADE'
 <!doctype html><html lang="{{ $locale }}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}">
 <title>{{ $locale }} {{ $page }}</title>
+@if(request()->boolean('site-theme'))
+<style nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}">:root { color-scheme: light; } html[data-fixture-theme="dark"] { color-scheme: dark; }</style>
+@endif
 <x-consent::head :nonce="Illuminate\Support\Facades\Vite::cspNonce()" :src="request()->boolean('assets') ? '/vendor/consent/consent.js' : null" />
 @livewireStyles(['nonce' => Illuminate\Support\Facades\Vite::cspNonce()])
 <script nonce="{{ Illuminate\Support\Facades\Vite::cspNonce() }}" data-navigate-once>
 window.fixtureDocument = window.fixtureDocument || Math.random(); window.fixtureVisits = window.fixtureVisits || [];
+document.addEventListener('click', event => {
+    if (event.target.closest('[data-fixture-theme-toggle]')) document.documentElement.dataset.fixtureTheme = document.documentElement.dataset.fixtureTheme === 'dark' ? 'light' : 'dark';
+});
 document.addEventListener('consent:navigated', e => window.fixtureVisits.push(e.detail));
 document.addEventListener('securitypolicyviolation', e => { (window.fixtureCsp ||= []).push({ directive: e.effectiveDirective, blocked: e.blockedURI }); });
 </script>
 </head><body>
-<main><h1 id="page-title">{{ $locale }} {{ $page }}</h1><nav>
+<main>@if(request()->boolean('site-theme'))<button type="button" data-fixture-theme-toggle>Toggle site theme</button>@endif<h1 id="page-title">{{ $locale }} {{ $page }}</h1><nav>
 @foreach(['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl'] as $lang)
 <a id="language-{{ $lang }}" href="/{{ $lang }}/{{ $page }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" wire:navigate>{{ $lang }}</a>
 @endforeach
@@ -181,6 +187,9 @@ Route::get('/{locale}/{page?}', function (string $locale, string $page = 'a') {
     abort_unless(in_array($locale, ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl']), 404);
     app()->setLocale($locale);
     config(['consent.ui.variant' => request('variant', 'standard'), 'consent.ui.position' => request('position', 'bottom-left'), 'consent.ui.theme' => request('theme', 'light')]);
+    if (request()->boolean('custom-colors')) {
+        config(['consent.ui.colors' => ['background' => '#fff1e6', 'text' => '#241f1f'], 'consent.ui.dark_colors' => ['background' => '#201629', 'text' => '#f5eaff']]);
+    }
     if (request()->boolean('tiktok')) {
         config(['consent.presets.tiktok_pixel.enabled' => true, 'consent.presets.tiktok_pixel.pixel_id' => 'C1234567890ABCDEFGHI']);
     }

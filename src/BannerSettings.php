@@ -56,8 +56,8 @@ final readonly class BannerSettings
         }
 
         $configuration += ['variant' => 'standard', 'position' => 'bottom-left', 'theme' => 'light', 'locale' => null, 'policy_url' => null, 'colors' => [], 'dark_colors' => [], 'validate_contrast' => false];
-        if (! in_array($configuration['theme'], ['light', 'dark', 'auto'], true)) {
-            throw new InvalidArgumentException('Consent theme must be light, dark, or auto.');
+        if (! in_array($configuration['theme'], ['light', 'dark', 'auto', 'inherit'], true)) {
+            throw new InvalidArgumentException('Consent theme must be light, dark, auto, or inherit.');
         }
         $this->theme = $configuration['theme'];
         $this->variant = self::variant($configuration['variant']);

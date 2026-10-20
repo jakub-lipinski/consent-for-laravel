@@ -144,7 +144,7 @@ return [
         // Supported: bottom-left, bottom-right, bottom-center.
         'position' => 'bottom-left',
 
-        // Supported: light, dark, auto (browser/system preference).
+        // Supported: light, dark, auto (system), inherit (site color-scheme).
         'theme' => 'light',
 
         'locale' => null,

@@ -53,7 +53,7 @@ async function page(t, options = {}) {
 }
 async function idle(p) { await p.api.whenIdle(); await tick(); }
 
-for (const theme of ['light', 'dark', 'auto']) {
+for (const theme of ['light', 'dark', 'auto', 'inherit']) {
     for (const variant of ['standard', 'compact']) {
         test(`${theme} theme in ${variant} keeps consent gates and draft/save behavior`, async t => {
             const input = { ui: { theme, variant } };

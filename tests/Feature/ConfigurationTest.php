@@ -102,7 +102,7 @@ it('exempts only the configured consent cookie during provider boot', function (
         ->and($middleware->isDisabled('ordinary_private_cookie'))->toBeFalse();
 });
 
-it('caches custom service and cookie configuration without closures or objects', function () {
+it('caches custom service and cookie configuration without closures or objects', function (string $theme) {
     $configuration = require dirname(__DIR__, 2).'/config/consent.php';
     $configuration['policy_version'] = 'policy-2';
     $configuration['cookie']['name'] = 'cached_consent';
@@ -110,7 +110,7 @@ it('caches custom service and cookie configuration without closures or objects',
     $configuration['ui']['locale'] = 'nl_BE';
     $configuration['ui']['validate_contrast'] = true;
     $configuration['ui']['colors'] = ['accent' => '#d86a32'];
-    $configuration['ui']['theme'] = 'auto';
+    $configuration['ui']['theme'] = $theme;
     $configuration['ui']['dark_colors'] = ['accent' => '#a5e4c4'];
     $configuration['services'] = ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']];
     $configuration['presets']['matomo'] = [
@@ -133,7 +133,7 @@ it('caches custom service and cookie configuration without closures or objects',
             ->and((new BannerSettings($cached['ui']))->locale)->toBe('nl-BE')
             ->and((new BannerSettings($cached['ui']))->validateContrast)->toBeTrue()
             ->and((new BannerSettings($cached['ui']))->colors['accent'])->toBe('#d86a32')
-            ->and((new BannerSettings($cached['ui']))->theme)->toBe('auto')
+            ->and((new BannerSettings($cached['ui']))->theme)->toBe($theme)
             ->and((new BannerSettings($cached['ui']))->darkColors['accent'])->toBe('#a5e4c4')
             ->and((new ServiceRegistry($cached['services']))->get('statistics')->category->value)->toBe('analytics')
             ->and((new MatomoSettings($cached['presets']['matomo']))->toArray())->toBe([
@@ -144,4 +144,4 @@ it('caches custom service and cookie configuration without closures or objects',
         $this->artisan('config:clear')->assertExitCode(0);
         unlink($configPath);
     }
-});
+})->with(['auto', 'inherit']);

@@ -10,7 +10,7 @@ PHP 8.3+ · Laravel 12-13 · MIT · No frontend framework or npm build required 
 
 - Matching Standard and Compact banners/preferences dialogs, three positions, editable colors and wording, and a reopening button.
 - English, Polish, German, French, Italian, Spanish, European Portuguese, Czech, and Dutch, plus custom languages with per-key fallback.
-- Configuration-only light, dark, and automatic themes, with independent color palettes for both variants.
+- Configuration-only light, dark, automatic, and inherited themes, with independent color palettes for both variants.
 - Five purpose categories, versioned preferences, equal acceptance/refusal retention, and safe defaults without a valid decision.
 - Optional database audit history with signed copies of the rendered banner and preferences dialog.
 - Cache-safe Blade script blocks with ordered loading, duplicate prevention, and permission checks before activation.
@@ -111,7 +111,7 @@ Edit the existing `ui` section in the Laravel-style config, which includes suppo
 'dark_colors' => [],
 ```
 
-Choose `standard` or `compact`, and `bottom-left`, `bottom-right`, or `bottom-center`. Set `theme` to `light` (default), `dark`, or `auto` to follow the browser/system preference. This is a config setting; no visitor-facing theme button is added. Empty `colors` and `dark_colors` inherit independent defaults; override selected keys with six-digit HEX values.
+Choose `standard` or `compact`, and `bottom-left`, `bottom-right`, or `bottom-center`. Set `theme` to `light` (default), `dark`, `auto` to follow the browser/system preference, or `inherit` to follow the host page's CSS `color-scheme`. This is a config setting; no visitor-facing theme button is added. Empty `colors` and `dark_colors` inherit independent defaults; override selected keys with six-digit HEX values.
 
 A null locale follows the application. Choose a bundled language or add your own dictionary; missing keys inherit parent-language and English values. A valid locale without a dictionary safely falls back to English. Provide your own policy page.
 

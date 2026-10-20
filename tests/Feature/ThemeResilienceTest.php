@@ -215,14 +215,14 @@ it('does not enable contrast diagnostics through a truthy non-boolean flag', fun
         ->and($settings->colorWarnings)->toHaveCount(1)->and($settings->colorWarnings[0])->toContain('must be boolean');
 });
 
-it('preserves saved consent and its lifetime across theme diagnostics changes', function (bool $allowed) {
+it('preserves saved consent and its lifetime across theme diagnostics changes', function (bool $allowed, string $theme) {
     config(['consent.services' => ['statistics' => ['category' => 'analytics', 'name' => 'Statistics', 'description' => 'Measure visits.']]]);
     $decision = app(ConsentManager::class)->choose(['analytics' => $allowed]);
     $cookie = app(ConsentCodec::class)->encode($decision);
-    config(['consent.ui.theme' => 'auto', 'consent.ui.dark_colors' => ['accent' => '#111b17'], 'consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
+    config(['consent.ui.theme' => $theme, 'consent.ui.dark_colors' => ['accent' => '#111b17'], 'consent.ui.validate_contrast' => true, 'consent.ui.colors' => ['accent' => '#d86a32']]);
     Blade::render('<x-consent::banner />');
     $restored = app(ConsentManager::class)->read(Request::create('https://example.test/', cookies: ['consent_preferences' => $cookie]));
 
     expect($restored->hasDecision())->toBeTrue()->and($restored->allows('analytics'))->toBe($allowed)
         ->and($restored->decidedAt)->toBe($decision->decidedAt)->and($restored->expiresAt)->toBe($decision->expiresAt);
-})->with([true, false]);
+})->with([true, false])->with(['auto', 'inherit']);

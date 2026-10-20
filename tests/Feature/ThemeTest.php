@@ -18,7 +18,7 @@ it('renders the configured theme in either variant without an unnecessary inline
     $html = Blade::render('<x-consent::banner nonce="theme-nonce" />');
     expect($html)->toContain('data-consent-theme="'.$theme.'"', 'data-consent-variant="'.$variant.'"')
         ->and(substr_count($html, '<style'))->toBe(1);
-})->with(['light', 'dark', 'auto'])->with(['standard', 'compact']);
+})->with(['light', 'dark', 'auto', 'inherit'])->with(['standard', 'compact']);
 
 it('rejects unsupported theme configuration', function (mixed $theme) {
     expect(fn () => new BannerSettings(['theme' => $theme]))->toThrow(InvalidArgumentException::class);
@@ -88,7 +88,7 @@ it('suppresses equivalent dark warnings across modes and reports a changed dark 
     $logger = Mockery::mock(LoggerInterface::class);
     $logger->shouldReceive('warning')->twice()->withArgs(fn (string $message, array $context) => str_contains(implode(' ', $context['issues']), 'Consent dark'));
     app()->instance(LoggerInterface::class, $logger);
-    foreach (['light', 'dark', 'auto'] as $theme) {
+    foreach (['light', 'dark', 'auto', 'inherit'] as $theme) {
         config(['consent.ui.theme' => $theme]);
         app(BannerSettings::class);
     }
