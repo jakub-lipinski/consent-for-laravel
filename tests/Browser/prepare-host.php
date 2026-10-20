@@ -84,6 +84,32 @@ $write('resources/views/components/single-check.blade.php', <<<'BLADE'
     @endconsent
 </div>
 BLADE);
+$serializedView = <<<'BLADE'
+<div>
+    <button id="serialized-update" wire:click="$set('count', {{ $count + 1 }})">Update serialized component</button>
+    <output id="serialized-count">{{ $count }}</output>
+    @consent('analytics', 'serialized-'.$count)
+<script src="/fixture/serialized.js"></script>
+<script>
+{
+    const value = @json('</script><script>');
+    const label = @json('</script> @endconsent');
+    const modern = @js('</script><script>');
+    const multiline = @json('
+</script>
+<script>window.literal = true;</script>
+@endconsent');
+    (window.fixtureSerializedValues ||= []).push({ value, label, modern, multiline, count: {{ $count }} });
+}
+</script>
+    @endconsent
+</div>
+BLADE;
+$serializedClass = '<?php new class extends \\Livewire\\Component { public int $count = 0; }; ?>';
+$write('resources/views/components/serialized-single.blade.php', $serializedClass."\n".$serializedView);
+$write('resources/views/components/serialized-multi/serialized-multi.php', $serializedClass);
+$write('resources/views/components/serialized-multi/serialized-multi.blade.php', $serializedView);
+
 $write('resources/views/fixture.blade.php', <<<'BLADE'
 <!doctype html><html lang="{{ $locale }}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}">
@@ -106,6 +132,8 @@ document.addEventListener('securitypolicyviolation', e => { (window.fixtureCsp |
 </nav><button id="outside" data-consent-open>Cookie preferences</button>
 <livewire:fixture :locale="$locale" :inline-banner="request()->boolean('component')" />
 @if($page === 'single' && method_exists(app('livewire'), 'addComponent'))<livewire:single-check />@endif
+@if($page === 'serialized-single' && method_exists(app('livewire'), 'addComponent'))<livewire:serialized-single />@endif
+@if($page === 'serialized-multi' && method_exists(app('livewire'), 'addComponent'))<livewire:serialized-multi />@endif
 @consent('analytics', 'site-sdk')
 <script src="/fixture/sdk.js"></script><script>window.fixtureInitialized = (window.fixtureInitialized || 0) + 1;</script>
 @endconsent
@@ -142,6 +170,10 @@ Route::get('/fixture/log', fn () => response()->json(is_file(storage_path('fixtu
 Route::get('/fixture/sdk.js', function () {
     file_put_contents(storage_path('fixture-requests.log'), "sdk\n", FILE_APPEND | LOCK_EX);
     return response('window.fixtureSdkLoads = (window.fixtureSdkLoads || 0) + 1; document.cookie="_fixture=1; Path=/";', 200, ['Content-Type' => 'application/javascript']);
+});
+Route::get('/fixture/serialized.js', function () {
+    file_put_contents(storage_path('fixture-requests.log'), "serialized\n", FILE_APPEND | LOCK_EX);
+    return response('window.fixtureSerializedLoads = (window.fixtureSerializedLoads || 0) + 1;', 200, ['Content-Type' => 'application/javascript']);
 });
 Route::get('/fixture/import.js', fn () => response('export const value = 42;', 200, ['Content-Type' => 'application/javascript']));
 Route::get('/fixture/module.js', fn () => response('import { value } from "/fixture/import.js"; await new Promise(r => setTimeout(r, 40)); window.fixtureModuleDone = value;', 200, ['Content-Type' => 'application/javascript']));
