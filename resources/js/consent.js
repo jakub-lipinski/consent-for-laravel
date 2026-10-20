@@ -1126,7 +1126,7 @@
         // events.js loads another asynchronous script; its own load event does not establish SDK readiness.
         const retryKey = `consent:script-timeout:${JSON.stringify([denialScope, config.policyVersion, config.servicesVersion, record.id, 'sdk'])}`;
         return new Promise((resolve, reject) => {
-            let interval, timer, settled = false;
+            let interval, timer, settled = false, sdkReady = false;
             const settle = error => {
                 if (settled) return;
                 settled = true; clearInterval(interval); clearTimeout(timer); record.cancels.delete(cancel);
@@ -1137,11 +1137,18 @@
             const check = () => {
                 try {
                     sync();
-                    if (!canRun('marketing')) { cancel(); return; }
-                    const instance = window.ttq?.instance?.(config.trackers.tiktok.id);
-                    const instances = window.ttq?.instances?.();
-                    if (instance && !Array.isArray(instance) && Array.isArray(instances) && instances.includes(instance)
-                        && typeof instance.track === 'function' && typeof instance.page === 'function') settle();
+                    if (reloading || revoking.has(record.category) || !permits(current, record.category)) { cancel(); return; }
+                    if (!sdkReady) {
+                        const instance = window.ttq?.instance?.(config.trackers.tiktok.id);
+                        const instances = window.ttq?.instances?.();
+                        if (instance && !Array.isArray(instance) && Array.isArray(instances) && instances.includes(instance)
+                            && typeof instance.track === 'function' && typeof instance.page === 'function') {
+                            sdkReady = true;
+                            clearTimeout(timer);
+                        }
+                    }
+                    // SDK readiness can finish during a swap; measurements still wait for navigation.
+                    if (sdkReady && !navigating) settle();
                 } catch (error) { settle(error); }
             };
             record.cancels.add(cancel);

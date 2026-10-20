@@ -2199,6 +2199,168 @@ for (const phase of ['bootstrap', 'runtime']) {
     });
 }
 
+
+const tiktokNavigationHead = '<meta data-consent-page content="tiktok-navigation">';
+const tiktokBootstrap = 'const sdk = document.createElement("script"); sdk.src = "/tiktok-main.js"; document.head.appendChild(sdk);';
+
+async function pendingTikTokNavigation(t, overrides = {}, bootstrapDelay = 0) {
+    const p = await page(t, {
+        config: { livewire: { enabled: true, navigation: 'auto', major: 4 }, trackers: { tiktok: tiktokConfig() }, ...overrides },
+        head: tiktokNavigationHead,
+        files: {
+            '/i18n/pixel/events.js': { body: tiktokBootstrap, delay: bootstrapDelay },
+            '/tiktok-main.js': `window.finishTikTok = () => { ${tiktokFixture} };`,
+        },
+    });
+    await p.api.choose({ marketing: true });
+    return p;
+}
+
+async function waitForTikTokStage(p) {
+    for (let i = 0; typeof p.window.finishTikTok !== 'function' && i < 100; i++) await delay(2);
+    assert.equal(typeof p.window.finishTikTok, 'function');
+}
+
+function beginTikTokVisit(p) {
+    p.window.document.dispatchEvent(new p.window.CustomEvent('livewire:navigating'));
+}
+
+async function finishTikTokVisit(p) {
+    p.window.document.dispatchEvent(new p.window.Event('livewire:navigated'));
+    await delay(0);
+}
+
+for (const readiness of ['before', 'during', 'after']) {
+    test(`TikTok readiness ${readiness} navigation preserves one initialization and discards paused events`, async t => {
+        const p = await pendingTikTokNavigation(t);
+        await waitForTikTokStage(p);
+        if (readiness === 'before') { p.window.finishTikTok(); await p.api.whenIdle(); }
+        beginTikTokVisit(p);
+        const paused = p.api.tiktok.track('Paused');
+        if (readiness === 'during') p.window.finishTikTok();
+        await delay(30);
+        assert.equal(p.api.allowed('marketing'), false);
+        assert.equal((p.window.tiktokCommands ?? []).filter(args => args[0] === 'page').length, readiness === 'before' ? 1 : 0);
+        await finishTikTokVisit(p);
+        if (readiness === 'after') p.window.finishTikTok();
+        assert.equal(await paused, false);
+        await p.api.whenIdle();
+        assert.equal(await p.api.tiktok.track('Purchase'), true);
+        assert.equal(p.api.allowed('marketing'), true);
+        assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+        assert.deepEqual(tiktokCommands(p).filter(args => args[0] === 'track').map(args => args[1]), ['Purchase']);
+        assert.deepEqual(p.loader.requests, ['/i18n/pixel/events.js', '/tiktok-main.js']);
+        assert.deepEqual(p.errors, []);
+        assert.deepEqual(p.reloads, []);
+    });
+}
+
+test('TikTok bootstrap completion during navigation still waits for SDK readiness and resumes once', async t => {
+    const p = await pendingTikTokNavigation(t, {}, 60);
+    for (let i = 0; p.loader.requests.length === 0 && i < 100; i++) await delay(1);
+    beginTikTokVisit(p);
+    await waitForTikTokStage(p);
+    p.window.finishTikTok();
+    await delay(30);
+    assert.equal(tiktokCommands(p).some(args => args[0] === 'page'), false);
+    await finishTikTokVisit(p); await p.api.whenIdle();
+    assert.equal(await p.api.tiktok.track('Purchase'), true);
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+    assert.deepEqual(p.loader.requests, ['/i18n/pixel/events.js', '/tiktok-main.js']);
+    assert.deepEqual(p.errors, []);
+});
+
+test('TikTok readiness survives consecutive navigation pauses without duplicate views or queued paused events', async t => {
+    const p = await pendingTikTokNavigation(t);
+    await waitForTikTokStage(p);
+    beginTikTokVisit(p);
+    const first = p.api.tiktok.track('FirstPaused');
+    await delay(20);
+    p.window.document.dispatchEvent(new p.window.Event('livewire:navigated'));
+    beginTikTokVisit(p);
+    p.window.finishTikTok();
+    const second = p.api.tiktok.track('SecondPaused');
+    await delay(30);
+    assert.equal(tiktokCommands(p).some(args => args[0] === 'page'), false);
+    await finishTikTokVisit(p); await p.api.whenIdle();
+    assert.deepEqual(await Promise.all([first, second]), [false, false]);
+    assert.equal(await p.api.tiktok.track('Purchase'), true);
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+    assert.deepEqual(p.loader.requests, ['/i18n/pixel/events.js', '/tiktok-main.js']);
+    assert.deepEqual(p.errors, []);
+});
+
+test('a ready TikTok SDK does not time out solely because navigation is still paused', async t => {
+    const p = await pendingTikTokNavigation(t, { scriptTimeoutMs: 200 });
+    await waitForTikTokStage(p);
+    beginTikTokVisit(p);
+    p.window.finishTikTok();
+    await delay(250);
+    assert.deepEqual(p.reloads, []);
+    assert.equal(tiktokCommands(p).some(args => args[0] === 'page'), false);
+    await finishTikTokVisit(p); await p.api.whenIdle();
+    assert.equal(await p.api.tiktok.track('Purchase'), true);
+    assert.equal(tiktokCommands(p).filter(args => args[0] === 'page').length, 1);
+    assert.deepEqual(p.errors, []);
+});
+
+for (const invalidation of ['refusal', 'forget', 'external', 'expiry', 'context']) {
+    test(`TikTok ${invalidation} while navigation is paused cancels readiness and never revives measurements`, async t => {
+        const p = await pendingTikTokNavigation(t);
+        await waitForTikTokStage(p);
+        beginTikTokVisit(p);
+        const paused = p.api.tiktok.track('Paused');
+        await delay(20);
+        if (invalidation === 'refusal') await p.api.rejectOptional();
+        else if (invalidation === 'forget') await p.api.forget();
+        else if (invalidation === 'external') { store(p.jar, decision(p.config, {})); await p.api.refresh(); }
+        else if (invalidation === 'expiry') {
+            const expiresAt = p.api.state().expiresAt;
+            p.window.Date.now = () => expiresAt * 1000;
+            await p.api.refresh();
+        } else p.window.document.querySelector('meta[data-consent-page]').content = 'different';
+        p.window.finishTikTok();
+        await finishTikTokVisit(p); await p.api.whenIdle();
+        assert.equal(await paused, false);
+        assert.equal(await p.api.tiktok.track('Purchase'), false);
+        assert.equal(tiktokCommands(p).some(args => ['page', 'track'].includes(args[0])), false);
+        assert.equal(p.reloads.length, 1);
+        assert.equal(p.errors.filter(error => error.code === 'tiktok').length, 0);
+    });
+}
+
+
+test('a TikTok provider failure during navigation remains isolated without dispatch or repeated loading', async t => {
+    const p = await pendingTikTokNavigation(t);
+    await waitForTikTokStage(p);
+    beginTikTokVisit(p);
+    p.window.ttq.instance = () => { throw new Error('SDK unavailable'); };
+    await delay(30);
+    await finishTikTokVisit(p); await p.api.whenIdle();
+    p.window.finishTikTok();
+    assert.equal(await p.api.tiktok.track('Purchase'), false);
+    p.window.document.body.insertAdjacentHTML('beforeend', block('independent', 'marketing', inline('order.push("independent")')));
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['independent']);
+    assert.equal(tiktokCommands(p).some(args => ['page', 'track'].includes(args[0])), false);
+    assert.equal(p.errors.filter(error => error.code === 'tiktok').length, 1);
+    assert.deepEqual(p.loader.requests, ['/i18n/pixel/events.js', '/tiktok-main.js']);
+    assert.deepEqual(p.reloads, []);
+});
+
+test('an unready TikTok SDK still reaches its bounded deadline during navigation', { timeout: 2000 }, async t => {
+    const p = await pendingTikTokNavigation(t, { scriptTimeoutMs: 200 });
+    await waitForTikTokStage(p);
+    beginTikTokVisit(p);
+    await p.api.whenIdle();
+    assert.deepEqual(p.reloads, [{ reason: 'script-timeout' }]);
+    assert.equal(p.errors.filter(error => error.code === 'tiktok').length, 1);
+    p.window.finishTikTok();
+    await finishTikTokVisit(p);
+    assert.equal(await p.api.tiktok.track('Purchase'), false);
+    assert.equal(tiktokCommands(p).some(args => ['page', 'track'].includes(args[0])), false);
+});
+
 test('TikTok synchronous withdrawal precedes listeners, cleans cookies, protects audit/session cookies, and forces reload', async t => {
     const p = await page(t, { config: { trackers: { tiktok: tiktokConfig() }, services: tiktokServices,
         protectedCookies: [...configuration().protectedCookies, 'consent_preferences_audit'] }, files: tiktokFiles });
