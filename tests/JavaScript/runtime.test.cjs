@@ -408,6 +408,70 @@ test('an identical replacement cannot revive a mutated detached block', async t 
     assert(p.errors.some(error => error.code === 'duplicate'));
 });
 
+test('a previously bound template cannot acquire a fresh ID after an identical replacement is discovered', async t => {
+    const markup = block('same', 'analytics', inline('order.push("same")'));
+    const p = await page(t, { html: markup });
+    const original = p.window.document.querySelector('template');
+    original.remove();
+    await delay(0); await p.api.whenIdle();
+    p.window.document.body.insertAdjacentHTML('beforeend', markup);
+    await delay(0); await p.api.whenIdle();
+    original.dataset.consentBlock = 'changed';
+    p.window.document.body.append(original);
+    await delay(0); await p.api.whenIdle();
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), []);
+    assert.equal(p.errors.filter(error => error.code === 'duplicate').length, 1);
+});
+
+test('many removed waiting blocks preserve their identities without activating absent scripts', async t => {
+    const markup = index => block('page-' + index, 'analytics', '<script src="/library.js"></script>' + inline(`order.push(${index})`));
+    const p = await page(t, { html: markup(0), files: { '/library.js': 'order.push("library")' } });
+    for (let index = 1; index <= 25; index++) {
+        p.window.document.body.innerHTML = markup(index);
+        await delay(0); await p.api.whenIdle();
+    }
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['library', 25]);
+    for (const index of [0, 25, 1, 0]) {
+        p.window.document.body.innerHTML = markup(index);
+        await delay(0); await p.api.whenIdle();
+    }
+    assert.deepEqual(plain(p.window.order), ['library', 25, 0, 1]);
+    assert.deepEqual(p.loader.requests, ['/library.js']);
+    assert.deepEqual(p.errors, []);
+});
+
+test('removing and later reattaching a loading block cannot resume its stopped tail', async t => {
+    const p = await page(t, { html: block('active', 'analytics', '<script src="/slow.js"></script>' + inline('order.push("tail")')),
+        files: { '/slow.js': { body: 'order.push("slow")', delay: 50 } } });
+    await p.api.choose({ analytics: true });
+    while (p.loader.requests.length === 0) await delay(1);
+    const template = p.window.document.querySelector('template');
+    template.remove();
+    await delay(0);
+    p.window.document.body.append(template);
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['slow']);
+    assert.deepEqual(p.loader.requests, ['/slow.js']);
+    await p.api.rejectOptional();
+    assert.deepEqual(p.reloads, [{ reason: 'revocation' }]);
+});
+
+test('withdrawal remembers started code after its template and inserted nodes disappear', async t => {
+    const markup = block('gone', 'analytics', inline('order.push("gone")'));
+    const p = await page(t, { html: markup });
+    await p.api.choose({ analytics: true }); await p.api.whenIdle();
+    p.window.document.querySelector('template').remove();
+    p.window.document.querySelector('head script:not([data-consent-config]):not([data-consent-runtime])').remove();
+    await delay(0); await p.api.whenIdle();
+    p.window.document.body.insertAdjacentHTML('beforeend', markup);
+    await delay(0); await p.api.whenIdle();
+    assert.deepEqual(plain(p.window.order), ['gone']);
+    await p.api.rejectOptional();
+    assert.deepEqual(p.reloads, [{ reason: 'revocation' }]);
+});
+
 test('a foreign SVG template cannot replace a detached HTML block', async t => {
     const markup = inline('order.push("original")');
     const p = await page(t, { html: block('same', 'analytics', markup) });

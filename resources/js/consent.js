@@ -355,6 +355,7 @@
             for (const record of active) {
                 for (const cancel of [...record.cancels]) cancel();
                 for (const node of record.nodes) node.remove();
+                record.nodes = [];
             }
             for (const hook of hooks) {
                 try {
@@ -676,10 +677,11 @@
         });
     }
 
-    function validBlock(record) {
-        const template = record.template;
+    function validBlock(record, template = record.template.deref()) {
+        if (!template) return true;
+        const signature = templates.get(template)?.signature;
         if (template.getAttribute('data-consent-block') === record.id
-            && `${template.getAttribute('data-consent-category')}\n${template.innerHTML}` === record.signature) return true;
+            && `${template.getAttribute('data-consent-category')}\n${template.innerHTML}` === signature) return true;
         record.status = 'failed';
         if (!template.hasAttribute('data-consent-conflict')) {
             template.setAttribute('data-consent-conflict', '');
@@ -688,7 +690,16 @@
         return false;
     }
 
-    const attachedBlock = record => document.documentElement?.contains(record.template) === true;
+    const attachedBlock = record => document.documentElement?.contains(record.template.deref() ?? null) === true;
+
+    function releaseBlocks() {
+        for (const record of records.values()) {
+            const attached = attachedBlock(record);
+            if (!attached && ['loading', 'paused'].includes(record.status)) record.status = 'stopped';
+            if (!attached || !['loading', 'paused'].includes(record.status)) record.content = null;
+            record.nodes = record.nodes.filter(node => node.isConnected);
+        }
+    }
 
     function blockIdentity(template) {
         const copy = template.cloneNode(true);
@@ -700,36 +711,36 @@
         const ordered = [];
         for (const template of document.querySelectorAll(selector)) {
             const discovered = templates.get(template);
-            if (discovered?.template === template && !validBlock(discovered)) continue;
+            if (discovered && !validBlock(discovered.record, template)) continue;
             const id = template.getAttribute('data-consent-block');
             const category = template.getAttribute('data-consent-category');
             const signature = `${category}\n${template.innerHTML}`;
             const identity = blockIdentity(template);
             if (records.has(id)) {
                 const record = records.get(id);
-                if (record.template === template) validBlock(record);
+                if (record.template.deref() === template) validBlock(record);
                 else if (!attachedBlock(record) && ['waiting', 'paused'].includes(record.status) && !record.started
                     && template.content?.nodeType === 11 && record.identity === identity && validBlock(record)) {
-                    record.template = template;
-                    record.signature = signature;
-                    record.content = template.content.cloneNode(true);
-                    templates.set(template, record);
+                    record.template = new WeakRef(template);
+                    record.content = null;
+                    templates.set(template, { record, signature });
                 }
                 if (record.identity !== identity && !template.hasAttribute('data-consent-conflict')) {
                     template.setAttribute('data-consent-conflict', '');
                     report('duplicate', new Error('Consent block IDs must identify identical scripts and categories.'), id);
                 }
-                if (record.template === template) ordered.push(record);
+                if (record.template.deref() === template) ordered.push(record);
                 continue;
             }
             if (!id || !knownCategories.includes(category) || template.content?.nodeType !== 11) {
                 report('block', new Error('Invalid consent script block.'), id);
                 continue;
             }
-            const record = { id, category, signature, identity, template, content: template.content.cloneNode(true), cursor: 0,
+            // Document-lifetime identities must not own the DOM of departed pages.
+            const record = { id, category, identity, template: new WeakRef(template), content: null, cursor: 0,
                 status: 'waiting', started: false, nodes: [], cancels: new Set() };
             records.set(id, record);
-            templates.set(template, record);
+            templates.set(template, { record, signature });
             ordered.push(record);
         }
         return ordered;
@@ -737,7 +748,7 @@
 
     async function execute(original, record) {
         sync();
-        if (record.template && (!attachedBlock(record) || record.status === 'failed' || !validBlock(record))) return false;
+        if (record.template && (!attachedBlock(record) || record.status !== 'loading' || !validBlock(record))) return false;
         if (!canRun(record.category)) return false;
         const type = (original.getAttribute('type') ?? '').trim().toLowerCase();
         const executable = ['', 'text/javascript', 'application/javascript', 'module'].includes(type);
@@ -859,6 +870,7 @@
             record.status = 'loading';
             try {
                 // Private copies cannot retain a mutated node after identical markup replaces the live template.
+                record.content ??= record.template.deref().content.cloneNode(true);
                 const children = [...record.content.childNodes];
                 if (children.some(node => node.nodeType !== 8 && !(node.nodeType === 3 && node.textContent.trim() === '')
                     && !(node.nodeType === 1 && node.tagName === 'SCRIPT'))) throw new Error('Consent blocks support only script elements, whitespace, and comments.');
@@ -873,6 +885,8 @@
             } catch (error) {
                 record.status = 'failed';
                 if (error.name !== 'AbortError') report('script', error, record.id);
+            } finally {
+                releaseBlocks();
             }
         }
     }
@@ -888,6 +902,7 @@
     }
 
     function schedule() {
+        releaseBlocks();
         if (!ready || reloading || navigating) return;
         const presets = schedulePresets();
         loadQueue = loadQueue.then(async () => { await presets; await drain(); }).catch(error => report('loader', error));
@@ -1505,6 +1520,7 @@
         cleanCookies(knownCategories.filter(key => key !== 'necessary' && !permits(current, key)));
         schedule();
         new MutationObserver(changes => {
+            if (changes.some(change => change.removedNodes.length > 0)) releaseBlocks();
             if (changes.some(change => change.type === 'attributes' && change.target.matches(selector)
                 || [...change.addedNodes].some(node => node.nodeType === 1 && (node.matches(selector) || node.querySelector(selector))))) schedule();
         }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-consent-block', 'data-consent-category'] });
