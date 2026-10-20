@@ -149,6 +149,9 @@ Route::get('/{locale}/{page?}', function (string $locale, string $page = 'a') {
     abort_unless(in_array($locale, ['en', 'pl', 'de', 'fr', 'it', 'es', 'pt', 'cs', 'nl']), 404);
     app()->setLocale($locale);
     config(['consent.ui.variant' => request('variant', 'standard'), 'consent.ui.position' => request('position', 'bottom-left'), 'consent.ui.theme' => request('theme', 'light')]);
+    if (request()->boolean('tiktok')) {
+        config(['consent.presets.tiktok_pixel.enabled' => true, 'consent.presets.tiktok_pixel.pixel_id' => 'C1234567890ABCDEFGHI']);
+    }
     if ($page === 'context') config(['consent.policy_version' => '2']);
     return view('fixture', compact('locale', 'page'));
 });
