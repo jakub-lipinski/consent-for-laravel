@@ -1437,6 +1437,86 @@ test('a later refusal prevents a late grant receipt from reactivating optional s
     assert.deepEqual(plain(p.window.order), []);
 });
 
+for (const refresh of [false, true]) {
+    for (const action of ['refusal', 'partial choice', 'withdrawal']) {
+        test(`a delayed audit cannot overwrite another tab's ${action} ${refresh ? 'after refresh' : 'before polling'}`, async t => {
+            const config = configuration({ audit: auditConfig });
+            const decidedAt = Math.floor(Date.now() / 1000) - 60;
+            const initial = decision(config, { analytics: true }, { decidedAt, expiresAt: decidedAt + config.retentionDays * 86400 });
+            let acknowledge;
+            const p = await page(t, {
+                config, state: initial,
+                html: auditNoticeHtml + block('ads', 'marketing', '<script src="/ads.js"></script>' + inline('order.push("ads")')),
+                files: { '/ads.js': 'window.adsLoaded = true;' },
+                before(window) { window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+            });
+            const other = await page(t, { config, jar: p.jar, html: auditNoticeHtml,
+                before(window) { window.fetch = async (url, options) => auditReceipt(options); },
+            });
+            const saving = p.api.acceptAll();
+            if (action === 'refusal') await other.api.rejectOptional();
+            else if (action === 'withdrawal') await other.api.forget();
+            else await other.api.choose({ analytics: true });
+            const latest = plain(other.api.state());
+            if (refresh) await p.api.refresh();
+            acknowledge();
+            assert.deepEqual(plain(await saving), latest);
+            await p.api.whenIdle();
+            assert.deepEqual(plain(p.api.state()), latest);
+            assert.deepEqual(plain(other.api.state()), latest);
+            assert.equal(p.api.allowed('marketing'), false);
+            assert.equal(p.window.adsLoaded, undefined);
+            assert.deepEqual(p.loader.requests, []);
+            assert.deepEqual(plain(p.window.order), []);
+            if (action === 'withdrawal') assert.equal(p.jar.getCookiesSync(url).some(cookie => cookie.key === 'consent_preferences'), false);
+            else assert.deepEqual(JSON.parse(decodeURIComponent(p.jar.getCookiesSync(url).find(cookie => cookie.key === 'consent_preferences').value)), latest);
+        });
+    }
+}
+
+test('an observed external decision supersedes a pending audit even if the cookie returns to its baseline', async t => {
+    const config = configuration({ audit: auditConfig });
+    const initial = decision(config, {});
+    let acknowledge;
+    const p = await page(t, { config, state: initial, html: auditNoticeHtml,
+        before(window) { window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+    });
+    const saving = p.api.acceptAll();
+    store(p.jar, decision(config, { analytics: true }));
+    await p.api.refresh();
+    store(p.jar, initial);
+    acknowledge(); await saving; await p.api.whenIdle();
+    assert.deepEqual(plain(p.api.state()), initial);
+    assert.equal(p.api.allowed('analytics'), false);
+    assert.equal(p.api.allowed('marketing'), false);
+});
+
+test('a new explicit audited choice can follow an external decision that arrived before invocation', async t => {
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+        before(window) { window.fetch = async (url, options) => auditReceipt(options); },
+    });
+    store(p.jar, decision(p.config, {}));
+    await p.api.acceptAll(); await p.api.whenIdle();
+    assert.equal(p.api.allowed('analytics'), true);
+    assert.equal(p.api.allowed('marketing'), true);
+});
+
+test('a delayed refusal receipt cannot overwrite another tab\'s newer audited acceptance', async t => {
+    let acknowledge;
+    const p = await page(t, { config: { audit: auditConfig }, html: auditNoticeHtml,
+        before(window) { window.fetch = (url, options) => new Promise(resolve => { acknowledge = () => resolve(auditReceipt(options)); }); },
+    });
+    const refusing = p.api.rejectOptional();
+    const other = await page(t, { config: p.config, jar: p.jar, html: auditNoticeHtml,
+        before(window) { window.fetch = async (url, options) => auditReceipt(options); },
+    });
+    await other.api.acceptAll();
+    const latest = plain(other.api.state());
+    acknowledge(); await refusing; await p.api.whenIdle();
+    assert.deepEqual(plain(p.api.state()), latest);
+    assert.deepEqual(plain(other.api.state()), latest);
+});
+
 test('mixed audit choices remove old grants immediately and delay newly granted categories', async t => {
     const config = configuration({ audit: auditConfig });
     let acknowledge;

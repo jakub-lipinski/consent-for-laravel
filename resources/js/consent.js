@@ -380,6 +380,10 @@
 
     function install(next, source) {
         if (JSON.stringify(next) === JSON.stringify(current)) return;
+        if (config.audit && source === 'refresh') {
+            ++auditRevision;
+            clearSavedAudit();
+        }
         const previous = current;
         current = snapshot(next);
         updateGoogle();
@@ -571,7 +575,7 @@
     }
 
     function choose(choices, action = 'save_preferences') {
-        let next, revision, audit, body, recovery;
+        let next, revision, audit, body, recovery, baseline;
         try {
             if (reloading) throw new Error('A consent reload is in progress.');
             if (!choices || Object.prototype.toString.call(choices) !== '[object Object]') throw new TypeError('Consent choices must be an object.');
@@ -582,11 +586,13 @@
                     || (!config.categories.includes(category) && choice)) throw new TypeError('Consent choices must be booleans for used categories; necessary cannot be denied.');
                 normalized[category] = choice;
             }
+            if (config.audit) sync();
             const decidedAt = now();
             next = { ...pending(), choices: normalized, decidedAt, expiresAt: decidedAt + config.retentionDays * 86400 };
             clearSavedAudit();
             revision = ++auditRevision;
             if (config.audit) {
+                baseline = JSON.stringify(read());
                 const reduced = { ...next, choices: Object.fromEntries(knownCategories.map(key =>
                     [key, key === 'necessary' || normalized[key] && permits(current, key)])) };
                 const removes = knownCategories.some(key => key !== 'necessary' && current.choices[key] && !normalized[key]);
@@ -600,7 +606,10 @@
                 audit.catch(() => {});
                 // New grants wait for a receipt. Removals take effect immediately,
                 // including when a previous grant is still waiting on the network.
-                if (removes || !knownCategories.some(key => key !== 'necessary' && normalized[key])) persistLocal(reduced, 'choice');
+                if (removes || !knownCategories.some(key => key !== 'necessary' && normalized[key])) {
+                    persistLocal(reduced, 'choice');
+                    baseline = JSON.stringify(read());
+                }
             }
         } catch (error) {
             if (body !== undefined) clearSavedAudit(body);
@@ -609,7 +618,14 @@
         return operation(async () => {
             try {
                 if (audit) await audit;
-                if (config.audit && revision !== auditRevision) return snapshot(current);
+                if (config.audit) {
+                    // Another tab/server can supersede this choice before polling notices its cookie.
+                    sync();
+                    if (revision !== auditRevision || JSON.stringify(read()) !== baseline) {
+                        await cleanupQueue;
+                        return snapshot(current);
+                    }
+                }
                 if (recovery?.error) throw recovery.error;
                 if (pendingAudit?.body === body) pendingAudit = null;
                 persistLocal(next, 'choice');

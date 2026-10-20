@@ -230,6 +230,55 @@ test('a delayed audit keeps its original language and cannot revive a newer refu
     expect(await page.evaluate(() => window.fixtureSdkLoads)).toBeUndefined();
 });
 
+for (const refresh of [false, true]) {
+    for (const action of ['refusal', 'partial choice', 'withdrawal']) {
+        test(`a delayed real audit receipt preserves another tab's ${action} ${refresh ? 'after refresh' : 'before polling'}`, async ({ page, context }) => {
+            await visit(page);
+            if (action === 'withdrawal') await page.evaluate(() => Consent.rejectOptional());
+            const other = await context.newPage();
+            await visit(other);
+            let release, marketingRequests = 0;
+            const submitted = [];
+            await page.route('**/fixture/audited-marketing.js', route => {
+                marketingRequests++;
+                return route.fulfill({ contentType: 'application/javascript', body: 'window.auditedMarketingLoaded = true;' });
+            });
+            await page.evaluate(() => {
+                const template = document.createElement('template');
+                template.dataset.consentBlock = 'audited-marketing';
+                template.dataset.consentCategory = 'marketing';
+                template.innerHTML = '<script src="/fixture/audited-marketing.js"></script><script>window.auditedMarketingTail = true;</script>';
+                document.body.appendChild(template);
+            });
+            await page.route('**/consent/decisions', async route => {
+                submitted.push(route.request().postDataJSON());
+                const response = await route.fetch();
+                expect(response.status()).toBe(201);
+                await new Promise(resolve => { release = resolve; });
+                await route.fulfill({ response });
+            });
+            await page.evaluate(() => { window.pendingAuditChoice = Consent.acceptAll(); });
+            await expect.poll(() => typeof release).toBe('function');
+            if (action === 'refusal') await other.evaluate(() => Consent.rejectOptional());
+            else if (action === 'withdrawal') await other.evaluate(() => Consent.forget());
+            else await other.evaluate(() => Consent.choose({ analytics: true }));
+            const latest = await other.evaluate(() => Consent.state());
+            if (refresh) await page.evaluate(() => Consent.refresh());
+            release();
+            expect(await page.evaluate(() => window.pendingAuditChoice)).toEqual(latest);
+            await idle(page);
+            expect(await page.evaluate(() => Consent.state())).toEqual(latest);
+            expect(await other.evaluate(() => Consent.state())).toEqual(latest);
+            expect(marketingRequests).toBe(0);
+            expect(await page.evaluate(() => [window.auditedMarketingLoaded, window.auditedMarketingTail])).toEqual([undefined, undefined]);
+            expect(submitted).toHaveLength(1);
+            const cookie = (await context.cookies()).find(cookie => cookie.name === 'consent_preferences');
+            if (action === 'withdrawal') expect(cookie).toBeUndefined();
+            else expect(JSON.parse(decodeURIComponent(cookie.value))).toEqual(latest);
+        });
+    }
+}
+
 for (const locale of ['en', 'cs', 'nl']) {
     test(`an unavailable audit leaves a translated retryable ${locale} interface without activating a grant`, async ({ page }) => {
         await page.route('**/consent/decisions', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
