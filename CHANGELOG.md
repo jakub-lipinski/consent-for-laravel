@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.1 - Audited consent across tabs
+
+- Preserve a newer saved refusal, partial selection, or withdrawal from another tab when an older audit acceptance receipt arrives late.
+- Reconcile shared preferences before applying successful receipts and invalidate pending choices and reload handoffs when refresh observes an external change.
+- Keep immediate denial, mixed-choice reload recovery, and fresh explicit choices compatible without changing APIs, configuration, cookie schema, service fingerprints, or preference lifetimes.
+- Add shared-cookie runtime and real two-tab browser regressions; update audit documentation, upgrade instructions, and existing Boost references.
+- Refresh/cache-bust published `consent.js` and invalidate cached HTML containing the old inline runtime. See the [release notes](docs/releases/v1.5.1.md) and [upgrade instructions](https://consent.lipinskijakub.pl/docs/upgrading#cross-tab-audit-fix).
+
 ## v1.5.0 - Livewire and more languages
 
 - Add complete Czech (`cs`) and Dutch (`nl`) interfaces, including preset purposes, accessible labels, status/error messages and audit notices, with regional fallback and Livewire language switching.

@@ -30,9 +30,13 @@ The built-in runtime records `acceptAll()`, `rejectOptional()`, `choose()`, and 
 
 `consent_decisions` stores full choices, action, event UUID, browser history ID, notice ID, server receipt time, and preference expiry. `consent_notices` stores the original signed snapshot with rendered banner/dialog, translations, canonical purposes, presentation, and asset fingerprints. Old cached pages submit their original wording; do not rebuild historical notices from current translations or modify signed notice JSON.
 
-New optional grants wait for a matching durable database receipt. Refusal/withdrawal deny locally immediately, including during delivery failure. Later denial supersedes pending acceptance; a delayed acceptance receipt cannot restore permission. Promise rejection reports a delivery failure and does not reverse local denial. Browser preference writes and audit delivery are distinct operations.
+New optional grants wait for a matching durable database receipt. Refusal/withdrawal deny locally immediately, including during delivery failure.
+
+Before applying a successful receipt, the runtime re-reads shared preferences. A changed saved decision from another tab or a server response supersedes the pending choice, including when refresh already observed it. The superseded choice resolves with the current state; its committed audit row remains history, not proof of current permission. Promise rejection reports a delivery failure and does not reverse local denial. Browser preference writes and audit delivery are distinct operations.
 
 When active withdrawal reloads a mixed change, the runtime carries the original event UUID, signed notice, and choices through a short-lived same-tab handoff. The next document retries the same event and enables new grants only after a matching receipt while the saved refusal and configuration still match. Session storage has an object-valued history-state fallback. A newer choice, failed receipt, or expired handoff discards recovery; unavailable handoff storage leaves the new grant denied. This is not an offline queue, and ordinary decisions without a required reload need no handoff.
+
+Deploy the current `consent.js` when upgrading audited applications. Refresh/cache-bust published runtimes and invalidate cached HTML containing an inline runtime; a Composer update alone does not replace published JavaScript.
 
 An audit failure does not necessarily revoke earlier valid permissions. For example, adding marketing to an existing analytics grant can fail while analytics remains allowed. Keep custom save errors neutral and retryable; do not claim that every optional cookie is blocked or that cookie storage caused an audit failure.
 
@@ -56,7 +60,7 @@ PHP `ConsentManager::persist()`/`forget()` are cookie helpers. For an explicitly
 
 ## Verification
 
-Check all four actions, stored translated snapshots, one history identity across actions, idempotent retries, and no writes from rendering/reads/measurements. Delay a successful receipt: optional SDKs must remain unloaded until it arrives. Simulate database/endpoint failure and a late receipt after refusal; denial must remain effective. Verify protected audit identity cookies survive tracker cleanup and pruning preserves referenced notices.
+Check all four actions, stored translated snapshots, one history identity across actions, idempotent retries, and no writes from rendering/reads/measurements. Delay a successful receipt: optional SDKs must remain unloaded until it arrives. Simulate database/endpoint failure and a late receipt after refusal; denial must remain effective. With two tabs sharing cookies, hold an acceptance receipt in the first, then refuse, save a partial selection, or forget in the second. For the forget scenario, begin with a saved decision so there is a preference cookie to remove. Release the receipt both before polling and after an explicit refresh. Assert the saved cookie, returned state, and denied SDK requests; the old acceptance must not restore removed permission. Verify protected audit identity cookies survive tracker cleanup and pruning preserves referenced notices.
 
 ## Common Pitfalls
 

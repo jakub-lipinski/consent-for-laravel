@@ -41,6 +41,7 @@ Run the applicable scenarios in a disposable application/test browser:
 | Loader timeout | Activation halts; bounded reload recovery prevents repeated automatic loops |
 | Enabled audit with delayed receipt | A new grant waits for durable acknowledgement |
 | Failed audit or late acceptance receipt after refusal | No new grant is revived; local denial remains |
+| Delayed audit receipt after another tab changes preferences | Newer saved refusal, partial selection, or cookie removal is preserved before polling and after refresh; denied SDKs make no requests |
 | Mixed audited change with active withdrawal reload | Immediate denial; same event retried without duplicate rows; new grant waits for receipt |
 | Changed, moved, or detached waiting blocks | Mutations stop activation; connected blocks follow current DOM order; detached blocks make no requests |
 | Failed audit when adding a category to an existing grant | Earlier permission can remain active; new permission stays denied; UI error remains neutral and retryable |
